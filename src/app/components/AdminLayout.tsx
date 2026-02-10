@@ -1,0 +1,111 @@
+import { ReactNode } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+
+interface AdminLayoutProps {
+  children: ReactNode;
+  title?: string;
+}
+
+export function AdminLayout({ children, title = 'Admin Dashboard' }: AdminLayoutProps) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  const menuItems = [
+    { path: '/admin-dashboard', icon: 'bi-speedometer2', label: 'Dashboard' },
+    { path: '/employees', icon: 'bi-people', label: 'Employees' },
+    { path: '/departments', icon: 'bi-building', label: 'Departments' },
+    { path: '/mark-attendance', icon: 'bi-calendar-check', label: 'Mark Attendance' },
+    { path: '/leave-management', icon: 'bi-calendar-x', label: 'Leave Management' },
+    { path: '/salary-management', icon: 'bi-cash-coin', label: 'Salary Management' },
+  ];
+
+  const handleLogout = () => {
+    localStorage.clear();
+    navigate('/login');
+  };
+
+  return (
+    <div className="min-vh-100 d-flex" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>
+      {/* Sidebar */}
+      <div className={`text-white ${sidebarCollapsed ? 'collapsed-sidebar' : 'sidebar'}`} style={{
+        width: sidebarCollapsed ? '80px' : '260px',
+        transition: 'width 0.3s',
+        position: 'fixed',
+        height: '100vh',
+        overflowY: 'auto',
+        zIndex: 1000,
+        background: 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)'
+      }}>
+        <div className="p-3 d-flex justify-content-between align-items-center" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+          {!sidebarCollapsed && <h5 className="mb-0"><i className="bi bi-building me-2"></i>HR System</h5>}
+          <button 
+            className="btn btn-sm btn-outline-light" 
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            title={sidebarCollapsed ? 'Expand' : 'Collapse'}
+          >
+            <i className={`bi bi-${sidebarCollapsed ? 'chevron-right' : 'chevron-left'}`}></i>
+          </button>
+        </div>
+        
+        <nav className="nav flex-column p-2">
+          {menuItems.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`nav-link text-white rounded mb-2 d-flex align-items-center ${location.pathname === item.path ? '' : ''}`}
+              style={{
+                padding: '12px 16px',
+                transition: 'all 0.2s',
+                textDecoration: 'none',
+                background: location.pathname === item.path ? 'rgba(255,255,255,0.2)' : 'transparent',
+                boxShadow: location.pathname === item.path ? '0 4px 12px rgba(0,0,0,0.15)' : 'none'
+              }}
+              onMouseEnter={(e) => {
+                if (location.pathname !== item.path) {
+                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (location.pathname !== item.path) {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }
+              }}
+            >
+              <i className={`bi ${item.icon} fs-5`} style={{ minWidth: '24px' }}></i>
+              {!sidebarCollapsed && <span className="ms-3">{item.label}</span>}
+            </Link>
+          ))}
+        </nav>
+        
+        <div className="position-absolute bottom-0 w-100 p-3" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+          <button 
+            className="btn w-100 d-flex align-items-center justify-content-center text-white" 
+            onClick={handleLogout}
+            style={{ background: 'rgba(255,255,255,0.2)', border: 'none' }}
+          >
+            <i className="bi bi-box-arrow-right"></i>
+            {!sidebarCollapsed && <span className="ms-2">Logout</span>}
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-grow-1" style={{ marginLeft: sidebarCollapsed ? '80px' : '260px', transition: 'margin-left 0.3s' }}>
+        <nav className="navbar navbar-expand-lg shadow-sm" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+          <div className="container-fluid">
+            <span className="navbar-brand fw-bold text-white">{title}</span>
+            <div className="navbar-nav ms-auto">
+              <span className="nav-link text-white"><i className="bi bi-person-circle me-2"></i>Admin</span>
+            </div>
+          </div>
+        </nav>
+        
+        <div className="content-wrapper">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
