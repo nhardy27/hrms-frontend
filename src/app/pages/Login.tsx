@@ -92,11 +92,12 @@ const Login = () => {
   };
 
   return (
-    <div className="min-vh-100 d-flex align-items-center justify-content-center bg-light">
-      <div className="card shadow" style={{ width: "400px" }}>
+    <div className="min-vh-100 d-flex align-items-center justify-content-center" style={{ background: '#f8f9fa' }}>
+      <div className="card shadow-lg border-0" style={{ width: "400px", borderRadius: '15px' }}>
         <div className="card-body p-4">
           <div className="text-center mb-4">
-            <h3 className="card-title text-primary">HR Management System</h3>
+            <img src="/Logo.png" alt="HR Management System" style={{ height: '60px', marginBottom: '20px', objectFit: 'contain' }} />
+            <h3 className="card-title fw-bold" style={{ color: '#2c3e50' }}>HR Management System</h3>
             <p className="text-muted">Login to your account</p>
           </div>
 
@@ -108,7 +109,7 @@ const Login = () => {
 
           <form onSubmit={handleSubmit}>
             <div className="mb-3">
-              <label htmlFor="username" className="form-label">
+              <label htmlFor="username" className="form-label fw-semibold" style={{ color: '#2c3e50' }}>
                 Username
               </label>
               <input
@@ -120,11 +121,12 @@ const Login = () => {
                 onChange={handleInputChange}
                 required
                 disabled={loading}
+                style={{ borderRadius: '8px', padding: '10px' }}
               />
             </div>
 
             <div className="mb-3">
-              <label htmlFor="password" className="form-label">
+              <label htmlFor="password" className="form-label fw-semibold" style={{ color: '#2c3e50' }}>
                 Password
               </label>
               <input
@@ -136,13 +138,15 @@ const Login = () => {
                 onChange={handleInputChange}
                 required
                 disabled={loading}
+                style={{ borderRadius: '8px', padding: '10px' }}
               />
             </div>
 
             <button
               type="submit"
-              className="btn btn-primary w-100"
+              className="btn w-100 text-white shadow"
               disabled={loading}
+              style={{ background: '#2c3e50', borderRadius: '8px', padding: '10px', border: 'none' }}
             >
               {loading ? "Logging in..." : "Login"}
             </button>

@@ -356,9 +356,9 @@ export function EmployeeForm() {
     <AdminLayout title={isEdit ? "Edit Employee" : "Add Employee"}>
       <Toaster position="bottom-center" />
       <div className="container-fluid p-4">
-        <div className="card border-0 shadow-lg mb-4" style={{ borderRadius: '15px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-          <div className="card-body p-4 text-white">
-            <h4 className="mb-0"><i className="bi bi-person-plus-fill me-2"></i>{isEdit ? "Edit Employee" : "Add Employee"}</h4>
+        <div className="card border-0 shadow-lg mb-4" style={{ borderRadius: '15px', background: '#ffffff' }}>
+          <div className="card-body p-4">
+            <h4 className="mb-0" style={{ color: '#2c3e50' }}><i className="bi bi-person-plus-fill me-2"></i>{isEdit ? "Edit Employee" : "Add Employee"}</h4>
           </div>
         </div>
 
@@ -569,11 +569,11 @@ export function EmployeeForm() {
             </div>
 
             <div className="d-flex gap-2 mt-4">
-              <button type="submit" className="btn text-white px-4 shadow" disabled={loading} style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '8px', border: 'none' }}>
+              <button type="submit" className="btn px-4 shadow" disabled={loading} style={{ background: '#2c3e50', color: 'white', borderRadius: '8px', border: 'none' }}>
                 <i className="bi bi-check-circle me-2"></i>
                 {loading ? 'Saving...' : 'Save'}
               </button>
-              <button type="button" className="btn btn-secondary px-4 shadow" onClick={handleCancel} style={{ borderRadius: '8px' }}>
+              <button type="button" className="btn px-4 shadow" onClick={handleCancel} style={{ background: '#2c3e50', color: 'white', borderRadius: '8px', border: 'none' }}>
                 <i className="bi bi-x-circle me-2"></i>
                 Cancel
               </button>

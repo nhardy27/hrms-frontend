@@ -93,7 +93,7 @@ export function LeaveManagement() {
       <Toaster position="bottom-center" />
       <div className="container-fluid p-4">
         <div className="card border-0 shadow-lg" style={{ borderRadius: '15px' }}>
-          <div className="card-header" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '15px 15px 0 0', border: 'none' }}>
+          <div className="card-header" style={{ background: '#2c3e50', borderRadius: '15px 15px 0 0', border: 'none' }}>
             <h5 className="mb-0 text-white"><i className="bi bi-calendar-x-fill me-2"></i>Employee Leave Requests</h5>
           </div>
           <div className="card-body">
@@ -136,14 +136,14 @@ export function LeaveManagement() {
                               <button 
                                 className="btn btn-sm shadow-sm"
                                 onClick={() => updateLeaveStatus(leave.id, 'APPROVED')}
-                                style={{ background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', color: 'white', border: 'none', borderRadius: '6px' }}
+                                style={{ background: '#28a745', color: 'white', border: 'none', borderRadius: '6px' }}
                               >
                                 <i className="bi bi-check-circle me-1"></i>Approve
                               </button>
                               <button 
                                 className="btn btn-sm shadow-sm ms-1"
                                 onClick={() => updateLeaveStatus(leave.id, 'REJECTED')}
-                                style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white', border: 'none', borderRadius: '6px' }}
+                                style={{ background: '#dc3545', color: 'white', border: 'none', borderRadius: '6px' }}
                               >
                                 <i className="bi bi-x-circle me-1"></i>Reject
                               </button>
