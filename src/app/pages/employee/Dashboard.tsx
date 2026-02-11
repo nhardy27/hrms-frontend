@@ -19,6 +19,7 @@ export function EmployeeDashboard() {
   const [hasCheckedOut, setHasCheckedOut] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
   const [attendanceStatusId, setAttendanceStatusId] = useState<string | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -242,91 +243,129 @@ export function EmployeeDashboard() {
     );
   }
 
+  const menuItems = [
+    { id: 'profile', icon: 'bi-person', label: 'Profile' },
+    { id: 'attendance', icon: 'bi-calendar-check', label: 'Attendance' },
+    { id: 'leaves', icon: 'bi-calendar-x', label: 'Leaves' },
+    { id: 'salary', icon: 'bi-cash-stack', label: 'Salary' },
+  ];
+
   return (
-    <div className="min-vh-100 bg-light">
+    <div className="min-vh-100 d-flex" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>
       <Toaster position="bottom-center" />
-      <nav className="navbar navbar-dark bg-success">
-        <div className="container-fluid">
-          <span className="navbar-brand">Employee Portal - {employee?.first_name}</span>
-          <button className="btn btn-outline-light" onClick={handleLogout}>
-            <i className="bi bi-box-arrow-right me-2"></i>Logout
+      
+      {/* Sidebar */}
+      <div className={`${sidebarCollapsed ? 'collapsed-sidebar' : 'sidebar'}`} style={{
+        width: sidebarCollapsed ? '80px' : '260px',
+        transition: 'width 0.3s',
+        position: 'fixed',
+        height: '100vh',
+        overflowY: 'auto',
+        zIndex: 1000,
+        background: '#ffffff',
+        borderRight: '1px solid #e9ecef'
+      }}>
+        <div className="p-3 d-flex justify-content-between align-items-center" style={{ borderBottom: '1px solid #e9ecef' }}>
+          {!sidebarCollapsed && (
+            <div className="d-flex align-items-center gap-2">
+              <img src="/Logo.png" alt="HR System" style={{ height: '40px', objectFit: 'contain' }} />
+              <h5 className="mb-0" style={{ color: '#2c3e50', textTransform: 'uppercase' }}>{employee?.first_name}</h5>
+            </div>
+          )}
+          <button 
+            className="btn btn-sm btn-outline-dark" 
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            style={{ marginLeft: sidebarCollapsed ? 'auto' : '0', marginRight: sidebarCollapsed ? 'auto' : '0' }}
+          >
+            <i className="bi bi-layout-sidebar-inset"></i>
           </button>
         </div>
-      </nav>
-
-      <div className="container mt-4">
-        <div className="row mb-4">
-          <div className="col-md-6">
-            <div className="card bg-success text-white">
-              <div className="card-body text-center">
-                <i className="bi bi-box-arrow-in-right fs-1 mb-2"></i>
-                <h5>Check In</h5>
-                <button 
-                  className="btn btn-light" 
-                  onClick={handleCheckIn}
-                  disabled={!!todayAttendance}
-                >
-                  {todayAttendance ? 'Already Checked In Today' : 'Check In'}
-                </button>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-6">
-            <div className="card bg-danger text-white">
-              <div className="card-body text-center">
-                <i className="bi bi-box-arrow-right fs-1 mb-2"></i>
-                <h5>Check Out</h5>
-                <button 
-                  className="btn btn-light" 
-                  onClick={handleCheckOut}
-                  disabled={!todayAttendance || hasCheckedOut}
-                >
-                  {hasCheckedOut ? 'Already Checked Out' : !todayAttendance ? 'Check In First' : 'Check Out'}
-                </button>
-              </div>
-            </div>
-          </div>
+        
+        <nav className="nav flex-column p-2">
+          {menuItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className="nav-link text-dark rounded mb-2 d-flex align-items-center"
+              style={{
+                padding: '12px 16px',
+                transition: 'all 0.2s',
+                textDecoration: 'none',
+                background: activeTab === item.id ? '#f8f9fa' : 'transparent',
+                border: 'none',
+                textAlign: 'left'
+              }}
+            >
+              <i className={`bi ${item.icon} fs-5`} style={{ minWidth: '24px' }}></i>
+              {!sidebarCollapsed && <span className="ms-3">{item.label}</span>}
+            </button>
+          ))}
+        </nav>
+        
+        <div className="position-absolute bottom-0 w-100 p-3" style={{ borderTop: '1px solid #e9ecef' }}>
+          <button 
+            className="btn w-100 d-flex align-items-center justify-content-center btn-outline-dark" 
+            onClick={handleLogout}
+            style={{ border: '1px solid #dee2e6' }}
+          >
+            <i className="bi bi-box-arrow-right"></i>
+            {!sidebarCollapsed && <span className="ms-2">Logout</span>}
+          </button>
         </div>
+      </div>
 
-        <ul className="nav nav-tabs mb-3">
-          <li className="nav-item">
-            <button 
-              className={`nav-link ${activeTab === 'profile' ? 'active' : ''}`}
-              onClick={() => setActiveTab('profile')}
-            >
-              <i className="bi bi-person me-2"></i>Profile
-            </button>
-          </li>
-          <li className="nav-item">
-            <button 
-              className={`nav-link ${activeTab === 'attendance' ? 'active' : ''}`}
-              onClick={() => setActiveTab('attendance')}
-            >
-              <i className="bi bi-clock me-2"></i>Attendance
-            </button>
-          </li>
-          <li className="nav-item">
-            <button 
-              className={`nav-link ${activeTab === 'leaves' ? 'active' : ''}`}
-              onClick={() => setActiveTab('leaves')}
-            >
-              <i className="bi bi-calendar-x me-2"></i>Leaves
-            </button>
-          </li>
-          <li className="nav-item">
-            <button 
-              className={`nav-link ${activeTab === 'salary' ? 'active' : ''}`}
-              onClick={() => setActiveTab('salary')}
-            >
-              <i className="bi bi-cash-stack me-2"></i>Salary
-            </button>
-          </li>
-        </ul>
+      {/* Main Content */}
+      <div className="flex-grow-1" style={{ marginLeft: sidebarCollapsed ? '80px' : '260px', transition: 'margin-left 0.3s' }}>
+        <nav className="navbar navbar-expand-lg shadow-sm" style={{ background: '#ffffff', borderBottom: '1px solid #e9ecef' }}>
+          <div className="container-fluid">
+            <span className="navbar-brand fw-bold" style={{ color: '#2c3e50' }}>Employee Portal - {employee?.first_name?.toUpperCase()}</span>
+            <div className="navbar-nav ms-auto">
+              <span className="nav-link" style={{ color: '#2c3e50' }}><i className="bi bi-person-circle me-2"></i>{employee?.username?.toUpperCase()}</span>
+            </div>
+          </div>
+        </nav>
+        
+        <div className="container-fluid p-4">
+          <div className="row mb-4">
+            <div className="col-md-6">
+              <div className="card shadow-sm border-0" style={{ background: '#ffffff' }}>
+                <div className="card-body text-center">
+                  <i className="bi bi-box-arrow-in-right fs-1 mb-2" style={{ color: '#2c3e50' }}></i>
+                  <h5 style={{ color: '#2c3e50' }}>Check In</h5>
+                  <button 
+                    className="btn text-white" 
+                    onClick={handleCheckIn}
+                    disabled={!!todayAttendance}
+                    style={{ background: '#2b3d4f', border: 'none' }}
+                  >
+                    {todayAttendance ? 'Already Checked In Today' : 'Check In'}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-6">
+              <div className="card shadow-sm border-0" style={{ background: '#ffffff' }}>
+                <div className="card-body text-center">
+                  <i className="bi bi-box-arrow-right fs-1 mb-2" style={{ color: '#2c3e50' }}></i>
+                  <h5 style={{ color: '#2c3e50' }}>Check Out</h5>
+                  <button 
+                    className="btn text-white" 
+                    onClick={handleCheckOut}
+                    disabled={!todayAttendance || hasCheckedOut}
+                    style={{ background: '#2b3d4f', border: 'none' }}
+                  >
+                    {hasCheckedOut ? 'Already Checked Out' : !todayAttendance ? 'Check In First' : 'Check Out'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
 
-        {activeTab === 'profile' && <ProfileTab employee={employee} />}
-        {activeTab === 'attendance' && <AttendanceTab attendances={attendances} />}
-        {activeTab === 'leaves' && <LeavesTab leaves={leaves} onLeaveApplied={fetchLeaveData} />}
-        {activeTab === 'salary' && <SalaryTab />}
+          {activeTab === 'profile' && <ProfileTab employee={employee} />}
+          {activeTab === 'attendance' && <AttendanceTab attendances={attendances} />}
+          {activeTab === 'leaves' && <LeavesTab leaves={leaves} onLeaveApplied={fetchLeaveData} />}
+          {activeTab === 'salary' && <SalaryTab />}
+        </div>
       </div>
     </div>
   );

@@ -70,9 +70,9 @@ export function SalaryTab() {
   }
 
   return (
-    <div className="card">
-      <div className="card-header bg-primary text-white">
-        <h5 className="mb-0"><i className="bi bi-cash-stack me-2"></i>My Salary</h5>
+    <div className="card shadow-sm border-0" style={{ background: '#ffffff' }}>
+      <div className="card-header" style={{ background: '#f8f9fa', borderBottom: '1px solid #e9ecef' }}>
+        <h5 className="mb-0" style={{ color: '#2c3e50' }}><i className="bi bi-cash-stack me-2"></i>My Salary</h5>
       </div>
       <div className="card-body">
         {salaries.length === 0 ? (
