@@ -76,7 +76,7 @@ export function AttendanceTab({ attendances }: AttendanceTabProps) {
                   
                   return (
                     <tr key={att.id}>
-                      <td>{att.date}</td>
+                      <td>{new Date(att.date).toLocaleDateString('en-GB')}</td>
                       <td>{att.check_in || 'N/A'}</td>
                       <td>{att.check_out || 'N/A'}</td>
                       <td>{totalHours}</td>

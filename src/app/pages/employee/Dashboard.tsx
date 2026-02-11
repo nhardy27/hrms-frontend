@@ -20,21 +20,6 @@ export function EmployeeDashboard() {
   const [activeTab, setActiveTab] = useState('profile');
   const [attendanceStatusId, setAttendanceStatusId] = useState<string | null>(null);
 
-  const fetchAttendanceStatus = async () => {
-    try {
-      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.attendanceStatus}`);
-      if (response.ok) {
-        const data = await response.json();
-        const presentStatus = (data.results || data || []).find((status: any) => status.present === true);
-        if (presentStatus) {
-          setAttendanceStatusId(presentStatus.id);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching attendance status:', error);
-    }
-  };
-
   useEffect(() => {
     const token = localStorage.getItem('token');
     const user = localStorage.getItem('user');
@@ -44,157 +29,106 @@ export function EmployeeDashboard() {
       return;
     }
     
-    const userData = JSON.parse(user);
-    
-    // Prevent admin users from accessing employee dashboard
-    if (userData.is_superuser === true || (userData.is_staff === true && userData.username === 'admin')) {
-      toast.error('Admin users cannot access employee portal.');
-      navigate('/admin-dashboard');
-      return;
-    }
-    
-    const initializeData = async () => {
-      await fetchEmployeeData();
-      await fetchAttendanceStatus();
-      await fetchAttendanceData();
-      await fetchLeaveData();
-    };
-    
-    initializeData();
-  }, []);
-
-
-
-  const fetchEmployeeData = async () => {
-    const user = localStorage.getItem('user');
-    const token = localStorage.getItem('token');
-    
-    if (!user || !token) {
-      navigate('/login');
-      return;
-    }
-
     try {
+      const userData = JSON.parse(user);
+      
+      if (userData.is_superuser === true || (userData.is_staff === true && userData.username === 'admin')) {
+        toast.error('Admin users cannot access employee portal.');
+        navigate('/admin-dashboard');
+        return;
+      }
+      
+      fetchAllData();
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+      navigate('/login');
+    }
+  }, [navigate]);
+
+  const fetchAllData = async () => {
+    setLoading(true);
+    
+    try {
+      const user = localStorage.getItem('user');
+      if (!user) return;
+      
       const userData = JSON.parse(user);
       const currentUserId = userData.id;
       
-      // Fetch user data from API
-      const userResponse = await makeAuthenticatedRequest(
-        `${config.api.host}${config.api.user}`
-      );
+      // Single API call to get all data
+      const [userRes, deptRes, attRes, attStatusRes, leaveRes] = await Promise.all([
+        makeAuthenticatedRequest(`${config.api.host}${config.api.user}`),
+        makeAuthenticatedRequest(`${config.api.host}${config.api.department}`),
+        makeAuthenticatedRequest(`${config.api.host}${config.api.attendance}`),
+        makeAuthenticatedRequest(`${config.api.host}${config.api.attendanceStatus}`),
+        makeAuthenticatedRequest(`${config.api.host}${config.api.leave}`)
+      ]);
       
-      if (userResponse.ok) {
-        const usersData = await userResponse.json();
+      // Process user data
+      if (userRes.ok) {
+        const usersData = await userRes.json();
         const apiUserData = (usersData.results || []).find((u: any) => u.id === currentUserId);
         
-        if (apiUserData) {
-        
-        // Fetch department name
         let departmentName = 'N/A';
-        if (apiUserData.department) {
-          try {
-            const deptResponse = await makeAuthenticatedRequest(
-              `${config.api.host}${config.api.department}`
-            );
-            if (deptResponse.ok) {
-              const deptData = await deptResponse.json();
-              const departments = deptData.results || [];
-              const dept = departments.find((d: any) => d.id === apiUserData.department);
-              departmentName = dept ? dept.name : 'N/A';
-            }
-          } catch (deptError) {
-            console.log('Department fetch failed:', deptError);
-          }
+        if (apiUserData?.department && deptRes.ok) {
+          const deptData = await deptRes.json();
+          const dept = (deptData.results || []).find((d: any) => d.id === apiUserData.department);
+          departmentName = dept?.name || 'N/A';
         }
         
         setEmployee({
-          id: apiUserData.id.toString(),
-          emp_code: apiUserData.emp_code || 'N/A',
-          first_name: apiUserData.first_name || apiUserData.username?.charAt(0).toUpperCase() + apiUserData.username?.slice(1) || 'N/A',
-          last_name: apiUserData.last_name || '',
-          email: apiUserData.email || 'N/A',
-          username: apiUserData.username || 'N/A',
+          id: (apiUserData?.id || currentUserId).toString(),
+          emp_code: apiUserData?.emp_code || 'N/A',
+          first_name: apiUserData?.first_name || userData.username?.charAt(0).toUpperCase() + userData.username?.slice(1) || 'N/A',
+          last_name: apiUserData?.last_name || '',
+          email: apiUserData?.email || userData.email || 'N/A',
+          username: apiUserData?.username || userData.username || 'N/A',
           department_name: departmentName,
-          designation: apiUserData.designation || 'N/A'
+          designation: apiUserData?.designation || 'N/A'
         });
-        } else {
-          console.error('User not found in API response');
-          // Fallback to localStorage data
-          const fallbackData = {
-            id: userData.id.toString(),
-            emp_code: userData.emp_code || 'N/A',
-            first_name: userData.first_name || userData.username?.charAt(0).toUpperCase() + userData.username?.slice(1) || 'N/A',
-            last_name: userData.last_name || '',
-            email: userData.email || 'N/A',
-            username: userData.username || 'N/A',
-            department_name: 'N/A',
-            designation: userData.designation || 'N/A'
-          };
-          setEmployee(fallbackData);
-        }
-      } else {
-        console.error('Failed to fetch user data from API');
-        // Fallback to localStorage data if API fails
-        const fallbackData = {
-          id: userData.id.toString(),
-          emp_code: userData.emp_code || 'N/A',
-          first_name: userData.first_name || userData.username?.charAt(0).toUpperCase() + userData.username?.slice(1) || 'N/A',
-          last_name: userData.last_name || '',
-          email: userData.email || 'N/A',
-          username: userData.username || 'N/A',
-          department_name: 'N/A',
-          designation: userData.designation || 'N/A'
-        };
-        setEmployee(fallbackData);
       }
       
-    } catch (error) {
-      console.error('Error fetching employee data:', error);
-      navigate('/login');
-    }
-  };
-
-  const fetchAttendanceData = async () => {
-    try {
-      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.attendance}`);
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Fetched attendance data:', data);
-        
-        // Filter attendance for current user only
-        const currentUserId = parseInt(employee?.id || localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')!).id : '0');
-        const userAttendances = (data.results || []).filter((att: Attendance) => att.user === currentUserId);
-        
+      // Process attendance status
+      if (attStatusRes.ok) {
+        const statusData = await attStatusRes.json();
+        const presentStatus = (statusData.results || []).find((s: any) => 
+          s.status?.toLowerCase() === 'present'
+        );
+        if (presentStatus) {
+          setAttendanceStatusId(presentStatus.id);
+        } else {
+          console.warn('Present status not found, using first status');
+          if (statusData.results?.length > 0) {
+            setAttendanceStatusId(statusData.results[0].id);
+          }
+        }
+      }
+      
+      // Process attendance data
+      if (attRes.ok) {
+        const attData = await attRes.json();
+        const userAttendances = (attData.results || []).filter((att: Attendance) => att.user === currentUserId);
         setAttendances(userAttendances.slice(0, 5));
+        
         const today = new Date().toISOString().split('T')[0];
         const todayRecord = userAttendances.find((att: Attendance) => att.date === today);
         
         if (todayRecord) {
           setTodayAttendance(todayRecord);
           setHasCheckedOut(!!todayRecord.check_out);
-        } else {
-          setTodayAttendance(null);
-          setHasCheckedOut(false);
         }
-      } else {
-        console.error('Failed to fetch attendance:', await response.text());
       }
-    } catch (error) {
-      console.error('Error fetching attendance:', error);
-    }
-  };
-
-  const fetchLeaveData = async () => {
-    try {
-      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.leave}`);
-      if (response.ok) {
-        const data = await response.json();
-        const currentUserId = parseInt(employee?.id || localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')!).id : '0');
-        const userLeaves = (data.results || []).filter((leave: Leave) => leave.user === currentUserId);
+      
+      // Process leave data
+      if (leaveRes.ok) {
+        const leaveData = await leaveRes.json();
+        const userLeaves = (leaveData.results || []).filter((leave: Leave) => leave.user === currentUserId);
         setLeaves(userLeaves);
       }
+      
     } catch (error) {
-      console.error('Error fetching leaves:', error);
+      console.error('Error fetching data:', error);
+      toast.error('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
@@ -226,7 +160,7 @@ export function EmployeeDashboard() {
       
       if (response.ok) {
         toast.success('Checked in successfully!');
-        fetchAttendanceData();
+        fetchAllData();
       } else {
         const errorData = await response.text();
         console.error('Check-in failed:', errorData);
@@ -261,7 +195,7 @@ export function EmployeeDashboard() {
       if (response.ok) {
         setHasCheckedOut(true);
         toast.success('Checked out successfully!');
-        fetchAttendanceData();
+        fetchAllData();
       } else {
         toast.error('Failed to check out');
       }
@@ -271,8 +205,25 @@ export function EmployeeDashboard() {
     }
   };
 
-
-
+  const fetchLeaveData = async () => {
+    try {
+      const user = localStorage.getItem('user');
+      if (!user) return;
+      
+      const userData = JSON.parse(user);
+      const currentUserId = userData.id;
+      
+      const leaveRes = await makeAuthenticatedRequest(`${config.api.host}${config.api.leave}`);
+      
+      if (leaveRes.ok) {
+        const leaveData = await leaveRes.json();
+        const userLeaves = (leaveData.results || []).filter((leave: Leave) => leave.user === currentUserId);
+        setLeaves(userLeaves);
+      }
+    } catch (error) {
+      console.error('Error fetching leave data:', error);
+    }
+  };
   const handleLogout = () => {
     localStorage.clear();
     navigate('/login');

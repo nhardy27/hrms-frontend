@@ -166,20 +166,20 @@ export function MarkAttendance() {
     try {
       console.log('Starting attendance save...');
       
-      // Get attendance status ID
+      // Get attendance statuses
       const statusResponse = await makeAuthenticatedRequest(`${config.api.host}${config.api.attendanceStatus}`);
       if (!statusResponse.ok) {
         throw new Error('Failed to get attendance status');
       }
       const statusData = await statusResponse.json();
-      console.log('Status data:', statusData);
-      const presentStatus = (statusData.results || []).find((status: any) => status.present === true);
+      const statuses = statusData.results || [];
+      const presentStatus = statuses.find((s: any) => s.status?.toLowerCase() === 'present');
+      const halfDayStatus = statuses.find((s: any) => s.status?.toLowerCase() === 'halfday');
+      const absentStatus = statuses.find((s: any) => s.status?.toLowerCase() === 'absent');
       
       if (!presentStatus) {
         throw new Error('Present status not found');
       }
-      
-      console.log('Present status ID:', presentStatus.id);
 
       // Save manual time entries - only process employees with manual time changes
       let successCount = 0;
@@ -249,7 +249,10 @@ export function MarkAttendance() {
               console.log(`No check-in or check-out time for ${emp.first_name} ${emp.last_name}`);
               continue;
             }
+            // Calculate total_hours and determine status
             let totalHours = null;
+            let statusId = presentStatus.id; // default
+            
             if (manualTime.check_in && manualTime.check_out) {
               const checkIn = new Date(`1970-01-01T${manualTime.check_in}`);
               const checkOut = new Date(`1970-01-01T${manualTime.check_out}`);
@@ -258,12 +261,22 @@ export function MarkAttendance() {
               const minutes = Math.floor((totalMs % (1000 * 60 * 60)) / (1000 * 60));
               const seconds = Math.floor((totalMs % (1000 * 60)) / 1000);
               totalHours = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+              
+              // Auto-assign status based on hours
+              const totalHoursDecimal = hours + minutes / 60 + seconds / 3600;
+              if (totalHoursDecimal >= 7) {
+                statusId = presentStatus.id;
+              } else if (totalHoursDecimal >= 4 && halfDayStatus) {
+                statusId = halfDayStatus.id;
+              } else if (absentStatus) {
+                statusId = absentStatus.id;
+              }
             }
             
             const createData: Record<string, any> = {
               user: parseInt(emp.id),
               date: selectedDate,
-              attendance_status: presentStatus.id,
+              attendance_status: statusId,
               check_in: manualTime.check_in,
               check_out: manualTime.check_out,
               total_hours: totalHours

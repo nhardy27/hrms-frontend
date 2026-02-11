@@ -150,6 +150,11 @@ export function SalaryManagement() {
             };
           }
           return record;
+        }).sort((a: SalaryRecord, b: SalaryRecord) => {
+          const yearA = years.find(y => y.id === a.year)?.year || 0;
+          const yearB = years.find(y => y.id === b.year)?.year || 0;
+          if (yearB !== yearA) return yearB - yearA;
+          return b.month - a.month;
         });
         setSalaryRecords(records);
       } else {
@@ -553,7 +558,13 @@ export function SalaryManagement() {
                         type="number"
                         className="form-control shadow-sm"
                         value={formData.total_working_days}
-                        onChange={(e) => setFormData({ ...formData, total_working_days: parseInt(e.target.value) })}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value) || 0;
+                          const clampedValue = Math.max(1, Math.min(31, value));
+                          setFormData({ ...formData, total_working_days: clampedValue });
+                        }}
+                        min="1"
+                        max="31"
                         style={{borderRadius: '8px', padding: '10px'}}
                       />
                     </div>

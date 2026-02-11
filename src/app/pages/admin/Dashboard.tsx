@@ -1,108 +1,89 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
-import toast, { Toaster } from 'react-hot-toast';
+import toast, { Toaster } from "react-hot-toast";
 import config from "../../../config/global.json";
-import { makeAuthenticatedRequest, fetchAllPages } from '../../../utils/apiUtils';
+import { makeAuthenticatedRequest } from "../../../utils/apiUtils";
 
 export function AdminDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
+
   const [stats, setStats] = useState({ 
     totalEmployees: 0, 
     totalDepartments: 0,
-    presentToday: 0
+    presentToday: 0,
+    pendingLeaves: 0,
+    paidSalaries: 0,
+    unpaidSalaries: 0
   });
+
   const [loading, setLoading] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const menuItems = [
-    { path: '/admin-dashboard', icon: 'bi-speedometer2', label: 'Dashboard' },
-    { path: '/employees', icon: 'bi-people', label: 'Employees' },
-    { path: '/departments', icon: 'bi-building', label: 'Departments' },
-    { path: '/mark-attendance', icon: 'bi-calendar-check', label: 'Mark Attendance' },
-    { path: '/leave-management', icon: 'bi-calendar-x', label: 'Leave Management' },
-    { path: '/salary-management', icon: 'bi-cash-coin', label: 'Salary Management' },
+    { path: "/admin-dashboard", icon: "bi-speedometer2", label: "Dashboard" },
+    { path: "/employees", icon: "bi-people", label: "Employees" },
+    { path: "/departments", icon: "bi-building", label: "Departments" },
+    { path: "/mark-attendance", icon: "bi-calendar-check", label: "Mark Attendance" },
+    { path: "/leave-management", icon: "bi-calendar-x", label: "Leave Management" },
+    { path: "/salary-management", icon: "bi-cash-coin", label: "Salary Management" },
   ];
 
+  /* ============================
+      AUTH + ADMIN CHECK
+     ============================ */
   useEffect(() => {
-    const user = localStorage.getItem('user');
-    console.log('Admin Dashboard - User from localStorage:', user);
-    
+    const user = localStorage.getItem("user");
+
     if (!user) {
-      console.log('No user found, redirecting to login');
-      navigate('/login');
+      navigate("/login");
       return;
     }
-    
-    const userData = JSON.parse(user);
-    console.log('Admin Dashboard - Parsed user data:', userData);
-    console.log('Admin Dashboard - is_superuser:', userData.is_superuser);
-    console.log('Admin Dashboard - is_staff:', userData.is_staff);
-    
-    if (!(userData.is_superuser === true || (userData.is_staff === true && userData.username === 'admin'))) {
-      console.log('Access denied - not admin user');
-      toast.error('Access denied. Only admin users can access this page.');
-      navigate('/employee-dashboard');
-      return;
-    }
-    
-    console.log('Admin access granted');
-    fetchStats();
-  }, []);
 
-  const fetchStats = async () => {
-    setLoading(true);
-    
     try {
-      const [allEmployees, allDepartments] = await Promise.all([
-        fetchAllPages(`${config.api.host}${config.api.user}`),
-        fetchAllPages(`${config.api.host}${config.api.department}`)
-      ]);
-      
-      const regularEmployees = allEmployees.filter((emp: any) => 
-        !emp.is_superuser && emp.username !== 'admin'
-      );
-      
-      setStats(prev => ({ 
-        ...prev, 
-        totalEmployees: regularEmployees.length,
-        totalDepartments: allDepartments.length
-      }));
+      const userData = JSON.parse(user);
 
-      const allAttendances = await fetchAllPages(`${config.api.host}${config.api.attendance}`);
-      const today = new Date().toISOString().split('T')[0];
-      const todayAttendances = allAttendances.filter((att: any) => att.date === today);
-      
-      const presentToday = todayAttendances.filter((att: any) => {
-        if (!att.check_in) return false;
-        
-        if (att.total_hours) {
-          const [hours, minutes, seconds] = att.total_hours.split(':').map(Number);
-          const totalHours = hours + minutes / 60 + seconds / 3600;
-          return totalHours >= 7;
-        }
-        
-        if (att.check_in && !att.check_out) {
-          return true;
-        }
-        
-        if (att.check_in && att.check_out) {
-          const checkIn = new Date(`1970-01-01T${att.check_in}`);
-          const checkOut = new Date(`1970-01-01T${att.check_out}`);
-          const totalHours = (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60);
-          return totalHours >= 7;
-        }
-        
-        return false;
-      }).length;
-      
-      setStats(prev => ({ 
-        ...prev, 
-        presentToday: presentToday
-      }));
-      
+      const isAdmin =
+        userData.is_superuser === true ||
+        (userData.is_staff === true && userData.username === "admin");
+
+      if (!isAdmin) {
+        toast.error("Access denied. Only admin users can access this page.");
+        navigate("/employee-dashboard");
+        return;
+      }
+
+      fetchDashboardStats();
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      console.error("Error parsing user data:", error);
+      navigate("/login");
+    }
+  }, [navigate]);
+
+  const fetchDashboardStats = async () => {
+    setLoading(true);
+
+    try {
+      const response = await makeAuthenticatedRequest(
+        `${config.api.host}${config.api.adminDashboard}`
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setStats({
+          totalEmployees: data.total_employees || 0,
+          totalDepartments: data.total_departments || 0,
+          presentToday: data.present_today || 0,
+          pendingLeaves: data.pending_leaves || 0,
+          paidSalaries: data.total_paid_salaries || 0,
+          unpaidSalaries: data.total_unpaid_salaries || 0
+        });
+      } else {
+        toast.error("Failed to load dashboard data");
+      }
+    } catch (error) {
+      console.error("Admin dashboard error:", error);
+      toast.error("Failed to load dashboard data");
     } finally {
       setLoading(false);
     }
@@ -110,69 +91,75 @@ export function AdminDashboard() {
 
   const handleLogout = () => {
     localStorage.clear();
-    navigate('/login');
+    navigate("/login");
   };
+
+  const attendancePercentage =
+    stats.totalEmployees > 0
+      ? Math.round((stats.presentToday / stats.totalEmployees) * 100)
+      : 0;
 
   return (
     <div className="min-vh-100 bg-light d-flex">
       <Toaster position="bottom-center" />
-      
-      {/* Sidebar */}
-      <div className={`text-white ${sidebarCollapsed ? 'collapsed-sidebar' : 'sidebar'}`} style={{
-        width: sidebarCollapsed ? '80px' : '260px',
-        transition: 'width 0.3s',
-        position: 'fixed',
-        height: '100vh',
-        overflowY: 'auto',
-        zIndex: 1000,
-        background: 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)'
-      }}>
-        <div className="p-3 d-flex justify-content-between align-items-center" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-          {!sidebarCollapsed && <h5 className="mb-0"><i className="bi bi-building me-2"></i>HR System</h5>}
-          <button 
-            className="btn btn-sm btn-outline-light" 
+
+      {/* ================= Sidebar ================= */}
+      <div
+        className="text-white"
+        style={{
+          width: sidebarCollapsed ? "80px" : "260px",
+          transition: "width 0.3s",
+          position: "fixed",
+          height: "100vh",
+          zIndex: 1000,
+          background: "linear-gradient(180deg, #667eea 0%, #764ba2 100%)",
+        }}
+      >
+        <div className="p-3 d-flex justify-content-between align-items-center border-bottom border-white border-opacity-25">
+          {!sidebarCollapsed && (
+            <h5 className="mb-0">
+              <i className="bi bi-building me-2"></i>HR System
+            </h5>
+          )}
+          <button
+            className="btn btn-sm btn-outline-light"
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            title={sidebarCollapsed ? 'Expand' : 'Collapse'}
           >
-            <i className={`bi bi-${sidebarCollapsed ? 'chevron-right' : 'chevron-left'}`}></i>
+            <i
+              className={`bi bi-${
+                sidebarCollapsed ? "chevron-right" : "chevron-left"
+              }`}
+            ></i>
           </button>
         </div>
-        
+
         <nav className="nav flex-column p-2">
           {menuItems.map((item) => (
             <Link
               key={item.path}
               to={item.path}
-              className={`nav-link text-white rounded mb-2 d-flex align-items-center ${location.pathname === item.path ? '' : ''}`}
+              className="nav-link text-white rounded mb-2 d-flex align-items-center"
               style={{
-                padding: '12px 16px',
-                transition: 'all 0.2s',
-                textDecoration: 'none',
-                background: location.pathname === item.path ? 'rgba(255,255,255,0.2)' : 'transparent',
-                boxShadow: location.pathname === item.path ? '0 4px 12px rgba(0,0,0,0.15)' : 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (location.pathname !== item.path) {
-                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (location.pathname !== item.path) {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }
+                padding: "12px 16px",
+                background:
+                  location.pathname === item.path
+                    ? "rgba(255,255,255,0.2)"
+                    : "transparent",
               }}
             >
-              <i className={`bi ${item.icon} fs-5`} style={{ minWidth: '24px' }}></i>
-              {!sidebarCollapsed && <span className="ms-3">{item.label}</span>}
+              <i className={`bi ${item.icon} fs-5`} />
+              {!sidebarCollapsed && (
+                <span className="ms-3">{item.label}</span>
+              )}
             </Link>
           ))}
         </nav>
-        
-        <div className="position-absolute bottom-0 w-100 p-3" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-          <button 
-            className="btn w-100 d-flex align-items-center justify-content-center text-white" 
+
+        <div className="position-absolute bottom-0 w-100 p-3 border-top border-white border-opacity-25">
+          <button
+            className="btn w-100 text-white"
             onClick={handleLogout}
-            style={{ background: 'rgba(255,255,255,0.2)', border: 'none' }}
+            style={{ background: "rgba(255,255,255,0.2)" }}
           >
             <i className="bi bi-box-arrow-right"></i>
             {!sidebarCollapsed && <span className="ms-2">Logout</span>}
@@ -180,127 +167,256 @@ export function AdminDashboard() {
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-grow-1" style={{ marginLeft: sidebarCollapsed ? '80px' : '260px', transition: 'margin-left 0.3s' }}>
-        <nav className="navbar navbar-expand-lg shadow-sm" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+      {/* ================= Main Content ================= */}
+      <div
+        className="flex-grow-1"
+        style={{
+          marginLeft: sidebarCollapsed ? "80px" : "260px",
+          transition: "margin-left 0.3s",
+        }}
+      >
+        <nav
+          className="navbar shadow-sm"
+          style={{
+            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+          }}
+        >
           <div className="container-fluid">
-            <span className="navbar-brand fw-bold text-white">Admin Dashboard</span>
-            <div className="navbar-nav ms-auto">
-              <span className="nav-link text-white"><i className="bi bi-person-circle me-2"></i>Admin</span>
-            </div>
+            <span className="navbar-brand fw-bold text-white">
+              Admin Dashboard
+            </span>
+            <span className="text-white">
+              <i className="bi bi-person-circle me-2"></i>Admin
+            </span>
           </div>
         </nav>
 
-        <div className="container-fluid p-4" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', minHeight: 'calc(100vh - 56px)' }}>
+        <div
+          className="container-fluid p-4"
+          style={{
+            background:
+              "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
+            minHeight: "calc(100vh - 56px)",
+          }}
+        >
+          {/* ================= Cards ================= */}
           <div className="row g-4">
-            <div className="col-md-4">
-              <div className="card border-0 shadow-lg" style={{ borderRadius: '20px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', boxShadow: '0 10px 30px rgba(102, 126, 234, 0.3)' }}>
-                <div className="card-body text-white p-4">
-                  <div className="d-flex justify-content-between align-items-center">
+            {[
+              {
+                title: "Total Departments",
+                value: stats.totalDepartments,
+                icon: "bi-building",
+                gradient: "linear-gradient(135deg, #f093fb, #f5576c)",
+                link: "/departments"
+              },
+              {
+                title: "Total Employees",
+                value: stats.totalEmployees,
+                icon: "bi-people",
+                gradient: "linear-gradient(135deg, #667eea, #764ba2)",
+                link: "/employees"
+              },
+              {
+                title: "Present Today",
+                value: stats.presentToday,
+                icon: "bi-person-check",
+                gradient: "linear-gradient(135deg, #4facfe, #00f2fe)",
+                link: "/mark-attendance"
+              },
+            ].map((card, index) => (
+              <div key={index} className="col-md-4">
+                <div
+                  className="card border-0 shadow-lg text-white"
+                  style={{ 
+                    borderRadius: 20, 
+                    background: card.gradient,
+                    cursor: 'pointer',
+                    transform: 'scale(1)',
+                    transition: 'transform 0.2s'
+                  }}
+                  onClick={() => navigate(card.link)}
+                  onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                  onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                >
+                  <div className="card-body p-4 d-flex justify-content-between">
                     <div>
-                      <h2 className="fw-bold mb-1">{loading ? '...' : stats.totalEmployees}</h2>
-                      <p className="mb-0 opacity-75">Total Employees</p>
+                      <h2 className="fw-bold">
+                        {loading ? "..." : card.value}
+                      </h2>
+                      <p className="opacity-75 mb-0">{card.title}</p>
                     </div>
-                    <div className="bg-white bg-opacity-25 rounded-circle p-3">
-                      <i className="bi bi-people fs-1"></i>
-                    </div>
-                  </div>
-                  <div className="mt-3 pt-3 border-top border-white border-opacity-25">
-                    <small className="opacity-75"><i className="bi bi-arrow-up me-1"></i>Active workforce</small>
+                    <i className={`bi ${card.icon} fs-1 opacity-75`} />
                   </div>
                 </div>
               </div>
-            </div>
-            
+            ))}
+          </div>
+
+          <div className="row g-4 mt-2">
             <div className="col-md-4">
-              <div className="card border-0 shadow-lg" style={{ borderRadius: '20px', background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', boxShadow: '0 10px 30px rgba(240, 147, 251, 0.3)' }}>
-                <div className="card-body text-white p-4">
-                  <div className="d-flex justify-content-between align-items-center">
-                    <div>
-                      <h2 className="fw-bold mb-1">{loading ? '...' : stats.totalDepartments}</h2>
-                      <p className="mb-0 opacity-75">Total Departments</p>
-                    </div>
-                    <div className="bg-white bg-opacity-25 rounded-circle p-3">
-                      <i className="bi bi-building fs-1"></i>
-                    </div>
+              <div
+                className="card border-0 shadow-lg text-white"
+                style={{ 
+                  borderRadius: 20, 
+                  background: "linear-gradient(135deg, #fa709a, #fee140)",
+                  cursor: 'pointer',
+                  transform: 'scale(1)',
+                  transition: 'transform 0.2s'
+                }}
+                onClick={() => navigate('/leave-management')}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                <div className="card-body p-4 d-flex justify-content-between">
+                  <div>
+                    <h2 className="fw-bold">{loading ? "..." : stats.pendingLeaves}</h2>
+                    <p className="opacity-75 mb-0">Pending Leaves</p>
                   </div>
-                  <div className="mt-3 pt-3 border-top border-white border-opacity-25">
-                    <small className="opacity-75"><i className="bi bi-diagram-3 me-1"></i>Organization units</small>
-                  </div>
+                  <i className="bi bi-calendar-x fs-1 opacity-75" />
                 </div>
               </div>
             </div>
-            
             <div className="col-md-4">
-              <div className="card border-0 shadow-lg" style={{ borderRadius: '20px', background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', boxShadow: '0 10px 30px rgba(79, 172, 254, 0.3)' }}>
-                <div className="card-body text-white p-4">
-                  <div className="d-flex justify-content-between align-items-center">
-                    <div>
-                      <h2 className="fw-bold mb-1">{loading ? '...' : stats.presentToday}</h2>
-                      <p className="mb-0 opacity-75">Present Today</p>
-                    </div>
-                    <div className="bg-white bg-opacity-25 rounded-circle p-3">
-                      <i className="bi bi-person-check fs-1"></i>
-                    </div>
+              <div
+                className="card border-0 shadow-lg text-white"
+                style={{ 
+                  borderRadius: 20, 
+                  background: "linear-gradient(135deg, #a8edea, #fed6e3)",
+                  cursor: 'pointer',
+                  transform: 'scale(1)',
+                  transition: 'transform 0.2s'
+                }}
+                onClick={() => navigate('/salary-management')}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                <div className="card-body p-4 d-flex justify-content-between">
+                  <div>
+                    <h2 className="fw-bold">{loading ? "..." : stats.paidSalaries}</h2>
+                    <p className="opacity-75 mb-0">Paid Salaries</p>
                   </div>
-                  <div className="mt-3 pt-3 border-top border-white border-opacity-25">
-                    <small className="opacity-75"><i className="bi bi-calendar-check me-1"></i>{stats.totalEmployees > 0 ? Math.round((stats.presentToday/stats.totalEmployees)*100) : 0}% attendance rate</small>
+                  <i className="bi bi-cash-coin fs-1 opacity-75" />
+                </div>
+              </div>
+            </div>
+            <div className="col-md-4">
+              <div
+                className="card border-0 shadow-lg text-white"
+                style={{ 
+                  borderRadius: 20, 
+                  background: "linear-gradient(135deg, #ffecd2, #fcb69f)",
+                  cursor: 'pointer',
+                  transform: 'scale(1)',
+                  transition: 'transform 0.2s'
+                }}
+                onClick={() => navigate('/salary-management')}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                <div className="card-body p-4 d-flex justify-content-between">
+                  <div>
+                    <h2 className="fw-bold">{loading ? "..." : stats.unpaidSalaries}</h2>
+                    <p className="opacity-75 mb-0">Unpaid Salaries</p>
+                  </div>
+                  <i className="bi bi-exclamation-triangle fs-1 opacity-75" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ================= Attendance Overview ================= */}
+          <div className="row g-4 mt-2">
+            <div className="col-md-12">
+              <div className="card border-0 shadow-lg" style={{ borderRadius: 20 }}>
+                <div className="card-body p-4">
+                  <h5 className="fw-bold mb-4" style={{ color: '#667eea' }}>
+                    <i className="bi bi-graph-up me-2"></i>Today's Attendance Overview
+                  </h5>
+                  <div className="d-flex align-items-center justify-content-around">
+                    <div className="text-center">
+                      <div className="position-relative d-inline-block">
+                        <svg width="180" height="180">
+                          <circle cx="90" cy="90" r="70" fill="none" stroke="#e9ecef" strokeWidth="18"/>
+                          <circle cx="90" cy="90" r="70" fill="none" stroke="#4facfe" strokeWidth="18" 
+                            strokeDasharray={`${attendancePercentage * 4.4} 440`}
+                            strokeLinecap="round" transform="rotate(-90 90 90)"/>
+                        </svg>
+                        <div className="position-absolute top-50 start-50 translate-middle">
+                          <h1 className="fw-bold mb-0" style={{ color: '#667eea', fontSize: '2.5rem' }}>{attendancePercentage}%</h1>
+                          <small className="text-muted">Attendance Rate</small>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="d-flex gap-5">
+                      <div className="text-center">
+                        <div className="mb-2" style={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(135deg, #4facfe, #00f2fe)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <i className="bi bi-person-check fs-1 text-white"></i>
+                        </div>
+                        <h3 className="fw-bold mb-0">{stats.presentToday}</h3>
+                        <small className="text-muted">Present</small>
+                      </div>
+                      <div className="text-center">
+                        <div className="mb-2" style={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(135deg, #f093fb, #f5576c)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <i className="bi bi-person-x fs-1 text-white"></i>
+                        </div>
+                        <h3 className="fw-bold mb-0">{stats.totalEmployees - stats.presentToday}</h3>
+                        <small className="text-muted">Absent</small>
+                      </div>
+                      <div className="text-center">
+                        <div className="mb-2" style={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(135deg, #667eea, #764ba2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <i className="bi bi-people fs-1 text-white"></i>
+                        </div>
+                        <h3 className="fw-bold mb-0">{stats.totalEmployees}</h3>
+                        <small className="text-muted">Total</small>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
+          {/* ================= Monthly Summary ================= */}
           <div className="row g-4 mt-2">
-            <div className="col-md-6">
-              <div className="card border-0 shadow-lg" style={{ borderRadius: '20px', height: '300px', background: 'white', boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)' }}>
+            <div className="col-md-12">
+              <div className="card border-0 shadow-lg" style={{ borderRadius: 20 }}>
                 <div className="card-body p-4">
-                  <h5 className="fw-bold mb-4" style={{ color: '#667eea' }}><i className="bi bi-graph-up me-2"></i>Attendance Overview</h5>
-                  <div className="d-flex align-items-center justify-content-center" style={{ height: '200px' }}>
-                    <div className="text-center">
-                      <div className="position-relative d-inline-block">
-                        <svg width="180" height="180">
-                          <circle cx="90" cy="90" r="70" fill="none" stroke="#e9ecef" strokeWidth="20"/>
-                          <circle cx="90" cy="90" r="70" fill="none" stroke="#4facfe" strokeWidth="20" 
-                            strokeDasharray={`${stats.totalEmployees > 0 ? (stats.presentToday/stats.totalEmployees)*440 : 0} 440`}
-                            strokeLinecap="round" transform="rotate(-90 90 90)"/>
-                        </svg>
-                        <div className="position-absolute top-50 start-50 translate-middle">
-                          <h2 className="fw-bold mb-0" style={{ color: '#667eea' }}>{stats.totalEmployees > 0 ? Math.round((stats.presentToday/stats.totalEmployees)*100) : 0}%</h2>
-                          <small style={{ color: '#6c757d' }}>Present</small>
+                  <h5 className="fw-bold mb-4" style={{ color: '#667eea' }}>
+                    <i className="bi bi-calendar-month me-2"></i>This Month Summary - {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  </h5>
+                  <div className="row g-3">
+                    <div className="col-md-4">
+                      <div className="p-3 rounded" style={{ background: 'linear-gradient(135deg, #667eea15, #764ba215)' }}>
+                        <div className="d-flex align-items-center justify-content-between">
+                          <div>
+                            <small className="text-muted d-block">Total Working Days</small>
+                            <h4 className="fw-bold mb-0" style={{ color: '#667eea' }}>{new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()}</h4>
+                          </div>
+                          <i className="bi bi-calendar3 fs-2" style={{ color: '#667eea', opacity: 0.3 }}></i>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="col-md-6">
-              <div className="card border-0 shadow-lg" style={{ borderRadius: '20px', height: '300px', background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', boxShadow: '0 10px 30px rgba(250, 112, 154, 0.3)' }}>
-                <div className="card-body p-4 text-white">
-                  <h5 className="fw-bold mb-4"><i className="bi bi-bar-chart-fill me-2"></i>Today's Summary</h5>
-                  <div className="row h-75">
-                    <div className="col-4 text-center d-flex flex-column justify-content-center">
-                      <div className="bg-white bg-opacity-25 rounded-circle p-3 mx-auto mb-2" style={{ width: '70px', height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <i className="bi bi-person-check fs-2"></i>
+                    <div className="col-md-4">
+                      <div className="p-3 rounded" style={{ background: 'linear-gradient(135deg, #4facfe15, #00f2fe15)' }}>
+                        <div className="d-flex align-items-center justify-content-between">
+                          <div>
+                            <small className="text-muted d-block">Avg Attendance</small>
+                            <h4 className="fw-bold mb-0" style={{ color: '#4facfe' }}>{attendancePercentage}%</h4>
+                          </div>
+                          <i className="bi bi-graph-up-arrow fs-2" style={{ color: '#4facfe', opacity: 0.3 }}></i>
+                        </div>
                       </div>
-                      <h3 className="fw-bold mb-0">{stats.presentToday}</h3>
-                      <small className="opacity-75">Present</small>
                     </div>
-                    <div className="col-4 text-center d-flex flex-column justify-content-center">
-                      <div className="bg-white bg-opacity-25 rounded-circle p-3 mx-auto mb-2" style={{ width: '70px', height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <i className="bi bi-person-x fs-2"></i>
+                    <div className="col-md-4">
+                      <div className="p-3 rounded" style={{ background: 'linear-gradient(135deg, #fa709a15, #fee14015)' }}>
+                        <div className="d-flex align-items-center justify-content-between">
+                          <div>
+                            <small className="text-muted d-block">Leaves Approved</small>
+                            <h4 className="fw-bold mb-0" style={{ color: '#fa709a' }}>{stats.pendingLeaves}</h4>
+                          </div>
+                          <i className="bi bi-calendar-check fs-2" style={{ color: '#fa709a', opacity: 0.3 }}></i>
+                        </div>
                       </div>
-                      <h3 className="fw-bold mb-0">{stats.totalEmployees - stats.presentToday}</h3>
-                      <small className="opacity-75">Absent</small>
-                    </div>
-                    <div className="col-4 text-center d-flex flex-column justify-content-center">
-                      <div className="bg-white bg-opacity-25 rounded-circle p-3 mx-auto mb-2" style={{ width: '70px', height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <i className="bi bi-building fs-2"></i>
-                      </div>
-                      <h3 className="fw-bold mb-0">{stats.totalDepartments}</h3>
-                      <small className="opacity-75">Departments</small>
                     </div>
                   </div>
                 </div>
