@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import config from "../../../config/global.json";
 import { makeAuthenticatedRequest, fetchAllPages } from '../../../utils/apiUtils';
 import toast, { Toaster } from 'react-hot-toast';
@@ -17,7 +16,6 @@ interface LeaveRequest {
 }
 
 export function LeaveManagement() {
-  const navigate = useNavigate();
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
 

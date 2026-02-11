@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import toast, { Toaster } from 'react-hot-toast';
 import config from "../../../config/global.json";
 import { AdminLayout } from '../../components/AdminLayout';
@@ -13,7 +12,6 @@ interface Department {
 }
 
 export function DepartmentPage() {
-  const navigate = useNavigate();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);

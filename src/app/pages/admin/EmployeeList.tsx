@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import toast, { Toaster } from 'react-hot-toast';
 import config from '../../../config/global.json';
 import { fetchAllPages, makeAuthenticatedRequest } from '../../../utils/apiUtils';
@@ -30,7 +30,6 @@ interface Department {
 }
 
 export function EmployeeList() {
-  const navigate = useNavigate();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
