@@ -409,7 +409,33 @@ export function SalaryManagement() {
       console.log('Response status:', response.status);
       
       if (response.ok) {
+        const salaryData = await response.json();
         toast.success(editingId ? "Salary updated successfully" : "Salary created successfully");
+        
+        // Send email after creating or updating salary
+        const salaryId = editingId || salaryData.id;
+        if (salaryId) {
+          try {
+            const emailResponse = await makeAuthenticatedRequest(
+              `${config.api.host}${config.api.salary}${salaryData.id}/send_email/`,
+              {
+                method: 'POST'
+              }
+            );
+            
+            if (emailResponse.ok) {
+              toast.success("Salary email sent to employee");
+            } else {
+              const errorData = await emailResponse.json().catch(() => ({}));
+              console.error('Email error:', errorData);
+              toast.error("Salary created but failed to send email");
+            }
+          } catch (emailError) {
+            console.error("Error sending email:", emailError);
+            toast.error("Salary created but failed to send email");
+          }
+        }
+        
         // Reset form and editing state
         setEditingId(null);
         setFormData({

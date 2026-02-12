@@ -17,5 +17,6 @@
     "salary": "/api/v1/salary/",
     "year": "/api/v1/yearmaster/",
     "adminDashboard": "/api/v1/adminDashboard/"
+    
   }
 }
