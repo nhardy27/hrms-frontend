@@ -65,6 +65,10 @@ export function SalaryTab() {
     }
   };
 
+  const handleDownload = (salaryId: string) => {
+    window.open(`/employee-salary-slip/${salaryId}`, '_blank');
+  };
+
   if (loading) {
     return <div className="text-center py-4"><div className="spinner-border"></div></div>;
   }
@@ -91,6 +95,7 @@ export function SalaryTab() {
                   <th>Deduction</th>
                   <th>Net Salary</th>
                   <th>Status</th>
+                  <th>Download</th>
                 </tr>
               </thead>
               <tbody>
@@ -108,6 +113,15 @@ export function SalaryTab() {
                       <span className={`badge ${salary.payment_status === 'paid' ? 'bg-success' : 'bg-warning'}`}>
                         {salary.payment_status.toUpperCase()}
                       </span>
+                    </td>
+                    <td>
+                      <button 
+                        className="btn btn-sm btn-primary"
+                        onClick={() => handleDownload(salary.id)}
+                        title="Download Salary Slip"
+                      >
+                        <i className="bi bi-download"></i>
+                      </button>
                     </td>
                   </tr>
                 ))}

@@ -38,8 +38,10 @@ export function EmployeeList() {
   const itemsPerPage = 10;
 
   useEffect(() => {
-    fetchDepartments();
-    fetchEmployees();
+    const initializeData = async () => {
+      await fetchDepartments();
+    };
+    initializeData();
     
     // Listen for focus events to refresh data when returning from other pages
     const handleFocus = () => {

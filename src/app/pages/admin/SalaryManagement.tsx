@@ -292,6 +292,11 @@ export function SalaryManagement() {
     setFormData(prev => ({ ...prev, net_salary: netSalary.toFixed(2) }));
   };
 
+  // Function to handle viewing salary slip
+  const handleView = (salary: SalaryRecord) => {
+    navigate(`/salary-slip/${salary.id}`);
+  };
+
   // Function to handle editing an existing salary record
   const handleEdit = (salary: SalaryRecord) => {
     // Set editing mode with salary ID
@@ -820,8 +825,15 @@ export function SalaryManagement() {
                             {salary.payment_status.toUpperCase()}
                           </span>
                         </td>
-                        {/* Action buttons for edit and delete */}
+                        {/* Action buttons for view, edit and delete */}
                         <td>
+                        <button
+                          className="btn btn-sm shadow-sm me-1"
+                          onClick={() => handleView(salary)}
+                          style={{ background: '#3498db', color: 'white', border: 'none', borderRadius: '6px' }}
+                        >
+                          View
+                        </button>
                         <button
                           className="btn btn-sm shadow-sm me-1"
                           onClick={() => handleEdit(salary)}
