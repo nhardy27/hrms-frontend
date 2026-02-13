@@ -65,14 +65,18 @@ export function SalaryTab() {
     }
   };
 
+  const handleDownload = (salaryId: string) => {
+    window.open(`/employee-salary-slip/${salaryId}`, '_blank');
+  };
+
   if (loading) {
     return <div className="text-center py-4"><div className="spinner-border"></div></div>;
   }
 
   return (
-    <div className="card">
-      <div className="card-header bg-primary text-white">
-        <h5 className="mb-0"><i className="bi bi-cash-stack me-2"></i>My Salary</h5>
+    <div className="card shadow-sm border-0" style={{ background: '#ffffff' }}>
+      <div className="card-header" style={{ background: '#f8f9fa', borderBottom: '1px solid #e9ecef' }}>
+        <h5 className="mb-0" style={{ color: '#2c3e50' }}><i className="bi bi-cash-stack me-2"></i>My Salary</h5>
       </div>
       <div className="card-body">
         {salaries.length === 0 ? (
@@ -91,6 +95,7 @@ export function SalaryTab() {
                   <th>Deduction</th>
                   <th>Net Salary</th>
                   <th>Status</th>
+                  <th>Download</th>
                 </tr>
               </thead>
               <tbody>
@@ -108,6 +113,15 @@ export function SalaryTab() {
                       <span className={`badge ${salary.payment_status === 'paid' ? 'bg-success' : 'bg-warning'}`}>
                         {salary.payment_status.toUpperCase()}
                       </span>
+                    </td>
+                    <td>
+                      <button 
+                        className="btn btn-sm btn-primary"
+                        onClick={() => handleDownload(salary.id)}
+                        title="Download Salary Slip"
+                      >
+                        <i className="bi bi-download"></i>
+                      </button>
                     </td>
                   </tr>
                 ))}

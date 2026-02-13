@@ -11,8 +11,9 @@ export function MainLayout() {
     <div className="d-flex vh-100">
       {/* Sidebar */}
       <div className="bg-white border-end" style={{ width: '250px', minWidth: '250px' }}>
-        <div className="p-3 border-bottom">
-          <h5 className="mb-0 fw-semibold text-primary">HRMS</h5>
+        <div className="p-3 border-bottom d-flex align-items-center gap-2">
+          <img src="/Logo.png" alt="HRMS" style={{ height: '40px', objectFit: 'contain' }} />
+          <h5 className="mb-0 fw-semibold" style={{ color: '#2c3e50' }}>HR System</h5>
         </div>
         <nav className="nav flex-column p-2">
           <Link

@@ -1,0 +1,240 @@
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import toast, { Toaster } from 'react-hot-toast';
+import config from "../../../config/global.json";
+import { makeAuthenticatedRequest } from '../../../utils/apiUtils';
+import { AdminLayout } from '../../components/AdminLayout';
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+export function SalarySlip() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [salary, setSalary] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchSalaryDetails();
+  }, [id]);
+
+  const fetchSalaryDetails = async () => {
+    try {
+      const url = `${config.api.host}${config.api.salary}${id}/`;
+      const response = await makeAuthenticatedRequest(url);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setSalary(data);
+        
+        // Fetch full user details
+        if (data.user?.id) {
+          const userResponse = await makeAuthenticatedRequest(`${config.api.host}${config.api.user}${data.user.id}/`);
+          if (userResponse.ok) {
+            const userData = await userResponse.json();
+            setSalary((prev: any) => ({ ...prev, userDetails: userData }));
+          }
+        }
+        
+        // Fetch year details
+        if (data.year) {
+          const yearResponse = await makeAuthenticatedRequest(`${config.api.host}${config.api.year}${data.year}/`);
+          if (yearResponse.ok) {
+            const yearData = await yearResponse.json();
+            setSalary((prev: any) => ({ ...prev, yearDetails: yearData }));
+          }
+        }
+      } else {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        toast.error("Failed to fetch salary details");
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error loading salary slip");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  if (loading) {
+    return (
+      <AdminLayout title="Salary Slip">
+        <div className="text-center p-5">Loading...</div>
+      </AdminLayout>
+    );
+  }
+
+  if (!salary) {
+    return (
+      <AdminLayout title="Salary Slip">
+        <div className="text-center p-5">Salary record not found</div>
+      </AdminLayout>
+    );
+  }
+
+  const grossSalary = parseFloat(salary.basic_salary) + parseFloat(salary.hra) + parseFloat(salary.allowance);
+
+  return (
+    <AdminLayout title="Salary Slip">
+      <Toaster position="bottom-center" />
+      <div className="container-fluid p-4">
+        <div className="d-flex justify-content-end mb-3 no-print">
+          <button className="btn btn-secondary me-2" onClick={() => navigate('/salary-management')}>
+            <i className="bi bi-arrow-left me-2"></i>Back
+          </button>
+          <button className="btn btn-primary" onClick={handlePrint}>
+            <i className="bi bi-printer me-2"></i>Print
+          </button>
+        </div>
+
+        <div className="card border-0 shadow-lg" style={{ maxWidth: '800px', margin: '0 auto' }}>
+          <div className="card-body p-5">
+            <div className="text-center mb-4">
+              <h2 style={{ color: '#2c3e50', fontWeight: 'bold' }}>SALARY SLIP</h2>
+              <p style={{ color: '#7f8c8d' }}>
+                For the month of {MONTHS[salary.month - 1]} {salary.yearDetails?.year || ''}
+              </p>
+            </div>
+
+            <hr style={{ border: '2px solid #2c3e50' }} />
+
+            <div className="row mb-4">
+              <div className="col-6">
+                <p><strong>Employee Name:</strong> {salary.userDetails?.first_name || ''} {salary.userDetails?.last_name || ''}</p>
+                <p><strong>Employee Code:</strong> {salary.userDetails?.emp_code || salary.user?.username || 'N/A'}</p>
+              </div>
+              <div className="col-6">
+                <p><strong>Email:</strong> {salary.user?.email || ''}</p>
+                <p><strong>Payment Status:</strong> <span className={`badge ${salary.payment_status === 'paid' ? 'bg-success' : 'bg-warning'}`}>{salary.payment_status.toUpperCase()}</span></p>
+              </div>
+            </div>
+
+            <hr />
+
+            <div className="row mb-4">
+              <div className="col-12">
+                <h5 style={{ color: '#2c3e50', marginBottom: '20px' }}>Earnings</h5>
+                <table className="table table-bordered">
+                  <tbody>
+                    <tr>
+                      <td><strong>Basic Salary</strong></td>
+                      <td className="text-end">₹ {parseFloat(salary.basic_salary).toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>HRA</strong></td>
+                      <td className="text-end">₹ {parseFloat(salary.hra).toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Allowance</strong></td>
+                      <td className="text-end">₹ {parseFloat(salary.allowance).toFixed(2)}</td>
+                    </tr>
+                    <tr style={{ backgroundColor: '#f8f9fa' }}>
+                      <td><strong>Gross Salary</strong></td>
+                      <td className="text-end"><strong>₹ {grossSalary.toFixed(2)}</strong></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="row mb-4">
+              <div className="col-12">
+                <h5 style={{ color: '#2c3e50', marginBottom: '20px' }}>Attendance Details</h5>
+                <table className="table table-bordered">
+                  <tbody>
+                    <tr>
+                      <td><strong>Total Working Days</strong></td>
+                      <td className="text-end">{salary.total_working_days}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Present Days</strong></td>
+                      <td className="text-end">{salary.present_days}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Half Days</strong></td>
+                      <td className="text-end">{salary.half_days}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Absent Days</strong></td>
+                      <td className="text-end">{salary.absent_days}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="row mb-4">
+              <div className="col-12">
+                <h5 style={{ color: '#2c3e50', marginBottom: '20px' }}>Deductions</h5>
+                <table className="table table-bordered">
+                  <tbody>
+                    <tr>
+                      <td><strong>Total Deduction</strong></td>
+                      <td className="text-end">₹ {parseFloat(salary.deduction).toFixed(2)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <hr style={{ border: '2px solid #2c3e50' }} />
+
+            <div className="row mb-4">
+              <div className="col-12">
+                <table className="table table-bordered">
+                  <tbody>
+                    <tr style={{ backgroundColor: '#2c3e50', color: 'white' }}>
+                      <td><strong style={{ fontSize: '18px' }}>NET SALARY</strong></td>
+                      <td className="text-end"><strong style={{ fontSize: '18px' }}>₹ {parseFloat(salary.net_salary).toFixed(2)}</strong></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="text-center mt-5" style={{ color: '#7f8c8d', fontSize: '12px' }}>
+              <p>This is a computer-generated salary slip and does not require a signature.</p>
+              <p>For any queries, please contact HR department.</p>
+              <p>neel.humbingo@gmail.com</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        @media print {
+          @page {
+            margin: 0.5cm;
+            size: A4;
+          }
+          .no-print {
+            display: none !important;
+          }
+          body * {
+            visibility: hidden;
+          }
+          .card, .card * {
+            visibility: visible;
+          }
+          .card {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            max-width: 100% !important;
+            box-shadow: none !important;
+            margin: 0 !important;
+          }
+          body {
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+          }
+        }
+      `}</style>
+    </AdminLayout>
+  );
+}

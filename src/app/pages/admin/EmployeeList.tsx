@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import toast, { Toaster } from 'react-hot-toast';
 import config from '../../../config/global.json';
 import { fetchAllPages, makeAuthenticatedRequest } from '../../../utils/apiUtils';
@@ -30,7 +30,6 @@ interface Department {
 }
 
 export function EmployeeList() {
-  const navigate = useNavigate();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -39,8 +38,10 @@ export function EmployeeList() {
   const itemsPerPage = 10;
 
   useEffect(() => {
-    fetchDepartments();
-    fetchEmployees();
+    const initializeData = async () => {
+      await fetchDepartments();
+    };
+    initializeData();
     
     // Listen for focus events to refresh data when returning from other pages
     const handleFocus = () => {
@@ -131,17 +132,17 @@ export function EmployeeList() {
     <AdminLayout title="Employee Management">
       <Toaster position="bottom-center" />
       <div className="container-fluid p-4">
-        <div className="card border-0 shadow-lg mb-4" style={{ borderRadius: '15px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+        <div className="card border-0 shadow-lg mb-4" style={{ borderRadius: '15px', background: '#ffffff' }}>
           <div className="card-body p-3">
-            <div className="d-flex justify-content-between align-items-center text-white">
+            <div className="d-flex justify-content-between align-items-center">
               <div>
-                <h4 className="mb-1"><i className="bi bi-people-fill me-2"></i>Employees</h4>
-                <small className="opacity-75">
+                <h4 className="mb-1" style={{ color: '#2c3e50' }}><i className="bi bi-people-fill me-2"></i>Employees</h4>
+                <small className="opacity-75" style={{ color: '#7f8c8d' }}>
                   Total: {employees.length} employees | 
                   Showing: {Math.min((currentPage - 1) * itemsPerPage + 1, employees.length)}-{Math.min(currentPage * itemsPerPage, employees.length)} of {employees.length}
                 </small>
               </div>
-              <Link to="/employees/add" className="btn text-white px-4 shadow" style={{ background: 'rgba(255,255,255,0.2)', borderRadius: '8px', border: 'none' }}>
+              <Link to="/employees/add" className="btn px-4 shadow" style={{ background: '#3498db', color: 'white', borderRadius: '8px', border: 'none' }}>
                 <i className="bi bi-plus-circle me-2"></i>
                 Add Employee
               </Link>
@@ -184,7 +185,7 @@ export function EmployeeList() {
                         <td>{employee.email}</td>
                         <td>{employee.department_name || 'N/A'}</td>
                         <td>
-                          <span className={`badge bg-${employee.is_active ? 'success' : 'secondary'}`}>
+                          <span className={`badge ${employee.is_active ? '' : 'bg-secondary'}`} style={{ backgroundColor: employee.is_active ? '#2ecc71' : undefined }}>
                             {employee.is_active ? 'Active' : 'Inactive'}
                           </span>
                         </td>
@@ -192,7 +193,7 @@ export function EmployeeList() {
                           <Link 
                             to={`/employees/edit/${employee.id}`} 
                             className="btn btn-sm shadow-sm me-2"
-                            style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', border: 'none', borderRadius: '6px' }}
+                            style={{ background: '#9b59b6', color: 'white', border: 'none', borderRadius: '6px' }}
                           >
                             <i className="bi bi-pencil"></i> Edit
                           </Link>

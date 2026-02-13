@@ -1,10 +1,17 @@
+// React hooks for state and lifecycle management
 import { useState, useEffect } from "react";
+// Router hook for navigation
 import { useNavigate } from "react-router-dom";
+// Toast notifications for user feedback
 import toast, { Toaster } from 'react-hot-toast';
+// API configuration
 import config from "../../../config/global.json";
+// Utility for authenticated API requests
 import { makeAuthenticatedRequest } from '../../../utils/apiUtils';
+// Admin layout wrapper component
 import { AdminLayout } from '../../components/AdminLayout';
 
+// TypeScript interface for Employee data structure
 interface Employee {
   id: number;
   username: string;
@@ -14,11 +21,13 @@ interface Employee {
   emp_code?: string;
 }
 
+// TypeScript interface for Year data
 interface Year {
   id: string;
   year: number;
 }
 
+// TypeScript interface for Attendance records
 interface Attendance {
   id: string;
   user: number;
@@ -26,6 +35,7 @@ interface Attendance {
   total_hours?: string;
 }
 
+// TypeScript interface for Salary Record from API
 interface SalaryRecord {
   id: string;
   user: {
@@ -47,6 +57,7 @@ interface SalaryRecord {
   payment_status: string;
 }
 
+// TypeScript interface for Salary Form data
 interface SalaryForm {
   user: string;
   year: string;
@@ -64,6 +75,7 @@ interface SalaryForm {
   payment_status: string;
 }
 
+// Array of month names for dropdown and display
 const MONTHS = [
   { value: 1, label: 'January' },
   { value: 2, label: 'February' },
@@ -80,22 +92,30 @@ const MONTHS = [
 ];
 
 export function SalaryManagement() {
+  // Hook for programmatic navigation
   const navigate = useNavigate();
+  
+  // State to store list of employees
   const [employees, setEmployees] = useState<Employee[]>([]);
+  // State to store list of years
   const [years, setYears] = useState<Year[]>([]);
+  // State to store all salary records
   const [salaryRecords, setSalaryRecords] = useState<SalaryRecord[]>([]);
+  // State to track which salary is being edited (null = creating new)
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Loading state for form submission
   const [loading, setLoading] = useState(false);
   
+  // Form data state with initial values
   const [formData, setFormData] = useState<SalaryForm>({
     user: '',
     year: '',
-    month: new Date().getMonth() + 1,
+    month: new Date().getMonth() + 1, // Current month
     attendance: '',
     basic_salary: '',
     hra: '',
     allowance: '',
-    total_working_days: 26,
+    total_working_days: 26, // Default working days
     present_days: 0,
     absent_days: 0,
     half_days: 0,
@@ -104,6 +124,7 @@ export function SalaryManagement() {
     payment_status: 'unpaid'
   });
 
+  // Effect runs on component mount - checks authentication and loads initial data
   useEffect(() => {
     const user = localStorage.getItem('user');
     if (!user) {
@@ -112,27 +133,32 @@ export function SalaryManagement() {
     }
     
     const userData = JSON.parse(user);
+    // Check if user has admin privileges
     if (!(userData.is_superuser === true || (userData.is_staff === true && userData.username === 'admin'))) {
       toast.error('Access denied. Only admin users can access this page.');
       navigate('/employee-dashboard');
       return;
     }
     
+    // Load initial data
     fetchEmployees();
     fetchYears();
-    setTimeout(() => fetchSalaries(), 100);
+    setTimeout(() => fetchSalaries(), 100); // Slight delay to ensure employees are loaded first
   }, []);
 
+  // Effect runs when user, year, or month changes - fetches attendance data
   useEffect(() => {
     if (formData.user && formData.year && formData.month && !editingId) {
       fetchAttendanceForMonth();
     }
   }, [formData.user, formData.year, formData.month]);
 
+  // Effect runs when salary components change - recalculates net salary
   useEffect(() => {
     calculateNetSalary();
   }, [formData.basic_salary, formData.hra, formData.allowance, formData.deduction, formData.present_days, formData.half_days, formData.total_working_days]);
 
+  // Function to fetch all salary records from API
   const fetchSalaries = async () => {
     try {
       console.log('Fetching salaries from:', `${config.api.host}${config.api.salary}`);
@@ -141,6 +167,7 @@ export function SalaryManagement() {
       if (response.ok) {
         const data = await response.json();
         console.log('Salary data:', data);
+        // Map records and populate user details
         const records = (data.results || []).map((record: any) => {
           if (typeof record.user === 'number') {
             const emp = employees.find(e => e.id === record.user);
@@ -150,6 +177,12 @@ export function SalaryManagement() {
             };
           }
           return record;
+        }).sort((a: SalaryRecord, b: SalaryRecord) => {
+          // Sort by year (descending) then by month (descending)
+          const yearA = years.find(y => y.id === a.year)?.year || 0;
+          const yearB = years.find(y => y.id === b.year)?.year || 0;
+          if (yearB !== yearA) return yearB - yearA;
+          return b.month - a.month;
         });
         setSalaryRecords(records);
       } else {
@@ -162,11 +195,13 @@ export function SalaryManagement() {
     }
   };
 
+  // Function to fetch all active employees (excluding admin)
   const fetchEmployees = async () => {
     try {
       const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.user}`);
       if (response.ok) {
         const data = await response.json();
+        // Filter only active employees, exclude admin user
         const emps = data.results.filter((emp: any) => emp.is_active && emp.username !== 'admin');
         setEmployees(emps);
       }
@@ -176,6 +211,7 @@ export function SalaryManagement() {
     }
   };
 
+  // Function to fetch available years from API
   const fetchYears = async () => {
     try {
       const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.year}`);
@@ -189,6 +225,7 @@ export function SalaryManagement() {
     }
   };
 
+  // Function to fetch and calculate attendance for selected month
   const fetchAttendanceForMonth = async () => {
     try {
       const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.attendance}`);
@@ -196,6 +233,7 @@ export function SalaryManagement() {
         const data = await response.json();
         const selectedYear = years.find(y => y.id === formData.year)?.year;
         
+        // Filter attendance records for selected employee, year, and month
         const monthRecords = data.results.filter((att: Attendance) => {
           const attDate = new Date(att.date);
           return att.user === parseInt(formData.user) && 
@@ -206,16 +244,19 @@ export function SalaryManagement() {
         let presentDays = 0;
         let halfDays = 0;
         
+        // Calculate present and half days based on hours worked
         monthRecords.forEach((att: Attendance) => {
           if (att.total_hours) {
             const [hours] = att.total_hours.split(':').map(Number);
-            if (hours >= 7) presentDays++;
-            else if (hours >= 4) halfDays++;
+            if (hours >= 7) presentDays++; // Full day if 7+ hours
+            else if (hours >= 4) halfDays++; // Half day if 4-6 hours
           }
         });
         
+        // Calculate absent days
         const absentDays = formData.total_working_days - presentDays - halfDays;
         
+        // Update form with calculated attendance
         setFormData(prev => ({
           ...prev,
           present_days: presentDays,
@@ -229,22 +270,38 @@ export function SalaryManagement() {
     }
   };
 
+  // Function to calculate net salary based on components and attendance
   const calculateNetSalary = () => {
+    // Parse salary components
     const basic = parseFloat(formData.basic_salary) || 0;
     const hra = parseFloat(formData.hra) || 0;
     const allowance = parseFloat(formData.allowance) || 0;
     const deduction = parseFloat(formData.deduction) || 0;
     
+    // Calculate total salary and per day salary
     const totalSalary = basic + hra + allowance;
     const perDaySalary = totalSalary / formData.total_working_days;
+    
+    // Calculate earned salary (full days + half days at 50%)
     const earnedSalary = (formData.present_days * perDaySalary) + (formData.half_days * perDaySalary * 0.5);
+    
+    // Calculate final net salary after deductions
     const netSalary = earnedSalary - deduction;
     
+    // Update form with calculated net salary
     setFormData(prev => ({ ...prev, net_salary: netSalary.toFixed(2) }));
   };
 
+  // Function to handle viewing salary slip
+  const handleView = (salary: SalaryRecord) => {
+    navigate(`/salary-slip/${salary.id}`);
+  };
+
+  // Function to handle editing an existing salary record
   const handleEdit = (salary: SalaryRecord) => {
+    // Set editing mode with salary ID
     setEditingId(salary.id);
+    // Populate form with existing salary data
     setFormData({
       user: salary.user?.id.toString() || '',
       year: salary.year,
@@ -261,10 +318,13 @@ export function SalaryManagement() {
       net_salary: salary.net_salary,
       payment_status: salary.payment_status
     });
+    // Scroll to top to show form
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Function to delete a salary record
   const handleDelete = async (id: string) => {
+    // Confirm before deleting
     if (!confirm('Are you sure you want to delete this salary record?')) return;
     
     try {
@@ -275,7 +335,7 @@ export function SalaryManagement() {
       
       if (response.ok) {
         toast.success("Salary deleted successfully");
-        fetchSalaries();
+        fetchSalaries(); // Refresh the list
       } else {
         toast.error("Failed to delete salary");
       }
@@ -285,9 +345,11 @@ export function SalaryManagement() {
     }
   };
 
+  // Function to handle form submission (create or update salary)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate required fields
     if (!formData.user || !formData.year) {
       toast.error("Please select employee and year");
       return;
@@ -298,6 +360,7 @@ export function SalaryManagement() {
       return;
     }
     
+    // Check for duplicate salary record (only when creating new)
     if (!editingId) {
       const existingSalary = salaryRecords.find(
         record => record.user?.id === parseInt(formData.user) && 
@@ -312,6 +375,7 @@ export function SalaryManagement() {
     
     setLoading(true);
     try {
+      // Prepare payload for API
       const payload: any = {
         user: parseInt(formData.user),
         year: formData.year,
@@ -328,6 +392,7 @@ export function SalaryManagement() {
         payment_status: formData.payment_status
       };
       
+      // Add attendance ID if available
       if (formData.attendance) {
         payload.attendance = formData.attendance;
       }
@@ -335,6 +400,7 @@ export function SalaryManagement() {
       console.log('Submitting payload:', payload);
       console.log('URL:', editingId ? `${config.api.host}${config.api.salary}${editingId}/` : `${config.api.host}${config.api.salary}`);
       
+      // Make API request (PATCH for update, POST for create)
       const response = await makeAuthenticatedRequest(
         editingId 
           ? `${config.api.host}${config.api.salary}${editingId}/`
@@ -348,7 +414,34 @@ export function SalaryManagement() {
       console.log('Response status:', response.status);
       
       if (response.ok) {
+        const salaryData = await response.json();
         toast.success(editingId ? "Salary updated successfully" : "Salary created successfully");
+        
+        // Send email after creating or updating salary
+        const salaryId = editingId || salaryData.id;
+        if (salaryId) {
+          try {
+            const emailResponse = await makeAuthenticatedRequest(
+              `${config.api.host}${config.api.salary}${salaryData.id}/send_email/`,
+              {
+                method: 'POST'
+              }
+            );
+            
+            if (emailResponse.ok) {
+              toast.success("Salary email sent to employee");
+            } else {
+              const errorData = await emailResponse.json().catch(() => ({}));
+              console.error('Email error:', errorData);
+              toast.error("Salary created but failed to send email");
+            }
+          } catch (emailError) {
+            console.error("Error sending email:", emailError);
+            toast.error("Salary created but failed to send email");
+          }
+        }
+        
+        // Reset form and editing state
         setEditingId(null);
         setFormData({
           user: '',
@@ -366,8 +459,9 @@ export function SalaryManagement() {
           net_salary: '0',
           payment_status: 'unpaid'
         });
-        fetchSalaries();
+        fetchSalaries(); // Refresh salary list
       } else {
+        // Handle error response
         const errorText = await response.text();
         console.error('Error response:', errorText);
         let errorMsg = 'Failed to save salary';
@@ -389,11 +483,14 @@ export function SalaryManagement() {
 
   return (
     <AdminLayout title="Salary Management">
+      {/* Toast notification container */}
       <Toaster position="bottom-center" />
       <div className="container-fluid p-4">
+        {/* Salary Form Card */}
         <div className="card border-0 shadow-lg mb-4" style={{ borderRadius: '15px' }}>
-          <div className="card-header text-white d-flex justify-content-between align-items-center" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '15px 15px 0 0', border: 'none'}}>
+          <div className="card-header text-white d-flex justify-content-between align-items-center" style={{background: '#2c3e50', borderRadius: '15px 15px 0 0', border: 'none'}}>
             <h5 className="mb-0"><i className="bi bi-cash-stack me-2"></i>{editingId ? 'Edit' : 'Create'} Employee Salary</h5>
+            {/* Cancel Edit button - only shown when editing */}
             {editingId && (
               <button
                 type="button"
@@ -428,7 +525,7 @@ export function SalaryManagement() {
               {/* Employee & Period Selection */}
               <div className="card border-0 shadow-sm mb-3">
                 <div className="card-body">
-                  <h6 className="text-primary mb-3 fw-bold"><i className="bi bi-person-badge me-2"></i>Employee & Period Details</h6>
+                  <h6 className="mb-3 fw-bold" style={{ color: '#2c3e50' }}><i className="bi bi-person-badge me-2"></i>Employee & Period Details</h6>
                   <div className="row">
                     <div className="col-md-6 mb-3">
                       <label className="form-label fw-semibold text-secondary"><i className="bi bi-person me-1"></i>Employee *</label>
@@ -437,7 +534,7 @@ export function SalaryManagement() {
                         value={formData.user}
                         onChange={(e) => setFormData({ ...formData, user: e.target.value })}
                         required
-                        style={{borderRadius: '8px', padding: '10px'}}
+                        style={{borderRadius: '8px', padding: '10px', border: '1px solid #dee2e6', background: '#ffffff'}}
                       >
                         <option value="">Select Employee</option>
                         {employees.map(emp => (
@@ -455,7 +552,7 @@ export function SalaryManagement() {
                         value={formData.year}
                         onChange={(e) => setFormData({ ...formData, year: e.target.value })}
                         required
-                        style={{borderRadius: '8px', padding: '10px'}}
+                        style={{borderRadius: '8px', padding: '10px', border: '1px solid #dee2e6', background: '#ffffff'}}
                       >
                         <option value="">Select Year</option>
                         {years.map(year => (
@@ -473,7 +570,7 @@ export function SalaryManagement() {
                         value={formData.month}
                         onChange={(e) => setFormData({ ...formData, month: parseInt(e.target.value) })}
                         required
-                        style={{borderRadius: '8px', padding: '10px'}}
+                        style={{borderRadius: '8px', padding: '10px', border: '1px solid #dee2e6', background: '#ffffff'}}
                       >
                         {MONTHS.map(month => (
                           <option key={month.value} value={month.value}>
@@ -489,12 +586,12 @@ export function SalaryManagement() {
               {/* Salary Components */}
               <div className="card border-0 shadow-sm mb-3">
                 <div className="card-body">
-                  <h6 className="text-success mb-3 fw-bold"><i className="bi bi-currency-rupee me-2"></i>Salary Components</h6>
+                  <h6 className="mb-3 fw-bold" style={{ color: '#2c3e50' }}><i className="bi bi-currency-rupee me-2"></i>Salary Components</h6>
                   <div className="row">
                     <div className="col-md-4 mb-3">
                       <label className="form-label fw-semibold text-secondary">Basic Salary *</label>
                       <div className="input-group shadow-sm">
-                        <span className="input-group-text bg-success text-white" style={{borderRadius: '8px 0 0 8px'}}>₹</span>
+                        <span className="input-group-text text-white" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
                         <input
                           type="number"
                           className="form-control"
@@ -502,7 +599,7 @@ export function SalaryManagement() {
                           value={formData.basic_salary}
                           onChange={(e) => setFormData({ ...formData, basic_salary: e.target.value })}
                           required
-                          style={{borderRadius: '0 8px 8px 0', padding: '10px'}}
+                          style={{borderRadius: '0 8px 8px 0', padding: '10px', border: '1px solid #dee2e6', borderLeft: 'none', background: '#ffffff'}}
                         />
                       </div>
                     </div>
@@ -510,7 +607,7 @@ export function SalaryManagement() {
                     <div className="col-md-4 mb-3">
                       <label className="form-label fw-semibold text-secondary">HRA *</label>
                       <div className="input-group shadow-sm">
-                        <span className="input-group-text bg-success text-white" style={{borderRadius: '8px 0 0 8px'}}>₹</span>
+                        <span className="input-group-text text-white" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
                         <input
                           type="number"
                           className="form-control"
@@ -518,7 +615,7 @@ export function SalaryManagement() {
                           value={formData.hra}
                           onChange={(e) => setFormData({ ...formData, hra: e.target.value })}
                           required
-                          style={{borderRadius: '0 8px 8px 0', padding: '10px'}}
+                          style={{borderRadius: '0 8px 8px 0', padding: '10px', border: '1px solid #dee2e6', borderLeft: 'none', background: '#ffffff'}}
                         />
                       </div>
                     </div>
@@ -526,7 +623,7 @@ export function SalaryManagement() {
                     <div className="col-md-4 mb-3">
                       <label className="form-label fw-semibold text-secondary">Allowance *</label>
                       <div className="input-group shadow-sm">
-                        <span className="input-group-text bg-success text-white" style={{borderRadius: '8px 0 0 8px'}}>₹</span>
+                        <span className="input-group-text text-white" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
                         <input
                           type="number"
                           className="form-control"
@@ -534,7 +631,7 @@ export function SalaryManagement() {
                           value={formData.allowance}
                           onChange={(e) => setFormData({ ...formData, allowance: e.target.value })}
                           required
-                          style={{borderRadius: '0 8px 8px 0', padding: '10px'}}
+                          style={{borderRadius: '0 8px 8px 0', padding: '10px', border: '1px solid #dee2e6', borderLeft: 'none', background: '#ffffff'}}
                         />
                       </div>
                     </div>
@@ -545,7 +642,7 @@ export function SalaryManagement() {
               {/* Attendance Details */}
               <div className="card border-0 shadow-sm mb-3">
                 <div className="card-body">
-                  <h6 className="text-info mb-3 fw-bold"><i className="bi bi-calendar-check me-2"></i>Attendance Details</h6>
+                  <h6 className="mb-3 fw-bold" style={{ color: '#2c3e50' }}><i className="bi bi-calendar-check me-2"></i>Attendance Details</h6>
                   <div className="row">
                     <div className="col-md-3 mb-3">
                       <label className="form-label fw-semibold text-secondary">Total Working Days</label>
@@ -553,8 +650,14 @@ export function SalaryManagement() {
                         type="number"
                         className="form-control shadow-sm"
                         value={formData.total_working_days}
-                        onChange={(e) => setFormData({ ...formData, total_working_days: parseInt(e.target.value) })}
-                        style={{borderRadius: '8px', padding: '10px'}}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value) || 0;
+                          const clampedValue = Math.max(1, Math.min(31, value));
+                          setFormData({ ...formData, total_working_days: clampedValue });
+                        }}
+                        min="1"
+                        max="31"
+                        style={{borderRadius: '8px', padding: '10px', border: '1px solid #17a2b8', background: '#ffffff'}}
                       />
                     </div>
 
@@ -565,7 +668,7 @@ export function SalaryManagement() {
                         className="form-control shadow-sm"
                         value={formData.present_days}
                         readOnly
-                        style={{borderRadius: '8px', padding: '10px', background: '#e8f5e9'}}
+                        style={{borderRadius: '8px', padding: '10px', background: '#f8f9fa'}}
                       />
                     </div>
 
@@ -576,7 +679,7 @@ export function SalaryManagement() {
                         className="form-control shadow-sm"
                         value={formData.half_days}
                         readOnly
-                        style={{borderRadius: '8px', padding: '10px', background: '#fff3e0'}}
+                        style={{borderRadius: '8px', padding: '10px', background: '#f8f9fa'}}
                       />
                     </div>
 
@@ -587,54 +690,57 @@ export function SalaryManagement() {
                         className="form-control shadow-sm"
                         value={formData.absent_days}
                         readOnly
-                        style={{borderRadius: '8px', padding: '10px', background: '#ffebee'}}
+                        style={{borderRadius: '8px', padding: '10px', background: '#f8f9fa'}}
                       />
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Final Calculation */}
+              {/* Final Calculation Section */}
               <div className="card border-0 shadow-sm mb-3">
                 <div className="card-body">
-                  <h6 className="text-warning mb-3 fw-bold"><i className="bi bi-calculator me-2"></i>Final Calculation</h6>
+                  <h6 className="mb-3 fw-bold" style={{ color: '#2c3e50' }}><i className="bi bi-calculator me-2"></i>Final Calculation</h6>
                   <div className="row">
+                    {/* Deduction input field */}
                     <div className="col-md-4 mb-3">
                       <label className="form-label fw-semibold text-secondary">Deduction</label>
                       <div className="input-group shadow-sm">
-                        <span className="input-group-text bg-danger text-white" style={{borderRadius: '8px 0 0 8px'}}>₹</span>
+                        <span className="input-group-text text-white" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
                         <input
                           type="number"
                           className="form-control"
                           placeholder="0.00"
                           value={formData.deduction}
                           onChange={(e) => setFormData({ ...formData, deduction: e.target.value })}
-                          style={{borderRadius: '0 8px 8px 0', padding: '10px'}}
+                          style={{borderRadius: '0 8px 8px 0', padding: '10px', border: '1px solid #dee2e6', borderLeft: 'none', background: '#ffffff'}}
                         />
                       </div>
                     </div>
 
+                    {/* Net Salary - Auto-calculated, read-only */}
                     <div className="col-md-4 mb-3">
                       <label className="form-label fw-semibold text-secondary">Net Salary</label>
                       <div className="input-group shadow-sm">
-                        <span className="input-group-text text-white" style={{borderRadius: '8px 0 0 8px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}}>₹</span>
+                        <span className="input-group-text text-white" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
                         <input
                           type="number"
                           className="form-control fw-bold"
                           value={formData.net_salary}
                           readOnly
-                          style={{borderRadius: '0 8px 8px 0', padding: '10px', background: '#f3e5f5', fontSize: '1.1rem'}}
+                          style={{borderRadius: '0 8px 8px 0', padding: '10px', background: '#f8f9fa', fontSize: '1.1rem'}}
                         />
                       </div>
                     </div>
 
+                    {/* Payment Status dropdown */}
                     <div className="col-md-4 mb-3">
                       <label className="form-label fw-semibold text-secondary">Payment Status</label>
                       <select
                         className="form-select shadow-sm"
                         value={formData.payment_status}
                         onChange={(e) => setFormData({ ...formData, payment_status: e.target.value })}
-                        style={{borderRadius: '8px', padding: '10px'}}
+                        style={{borderRadius: '8px', padding: '10px', border: '1px solid #dee2e6', background: '#ffffff'}}
                       >
                         <option value="unpaid">Unpaid</option>
                         <option value="paid">Paid</option>
@@ -644,20 +750,23 @@ export function SalaryManagement() {
                 </div>
               </div>
 
+              {/* Form action buttons */}
               <div className="d-flex justify-content-end gap-3 mt-4">
+                {/* Cancel button - navigates back to dashboard */}
                 <button
                   type="button"
-                  className="btn btn-secondary px-4 py-2 shadow-sm"
+                  className="btn px-4 py-2 shadow-sm"
                   onClick={() => navigate("/admin-dashboard")}
-                  style={{borderRadius: '8px'}}
+                  style={{borderRadius: '8px', background: '#2b3d4f', color: 'white', border: 'none'}}
                 >
                   <i className="bi bi-x-circle me-2"></i>Cancel
                 </button>
+                {/* Submit button - creates or updates salary */}
                 <button
                   type="submit"
                   className="btn text-white px-4 py-2 shadow"
                   disabled={loading}
-                  style={{borderRadius: '8px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}}
+                  style={{borderRadius: '8px', background: editingId ? '#9b59b6' : '#3498db'}}
                 >
                   <i className="bi bi-check-circle me-2"></i>{loading ? (editingId ? "Updating..." : "Creating...") : (editingId ? "Update Salary" : "Create Salary")}
                 </button>
@@ -666,15 +775,18 @@ export function SalaryManagement() {
           </div>
         </div>
 
+        {/* Salary Records Table Card */}
         <div className="card border-0 shadow-lg" style={{ borderRadius: '15px' }}>
-          <div className="card-header text-white" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '15px 15px 0 0', border: 'none'}}>
+          <div className="card-header text-white" style={{background: '#2c3e50', borderRadius: '15px 15px 0 0', border: 'none'}}>
             <h5 className="mb-0"><i className="bi bi-table me-2"></i>Salary Records</h5>
           </div>
           <div className="card-body">
+            {/* Show message if no records exist */}
             {salaryRecords.length === 0 ? (
               <p className="text-center text-muted">No salary records found</p>
             ) : (
               <div className="table-responsive">
+                {/* Table displaying all salary records */}
                 <table className="table table-hover">
                   <thead>
                     <tr>
@@ -693,9 +805,11 @@ export function SalaryManagement() {
                     </tr>
                   </thead>
                   <tbody>
+                    {/* Map through salary records and display each row */}
                     {salaryRecords.map(salary => (
                       <tr key={salary.id}>
                         <td>{salary.user?.username || 'N/A'}</td>
+                        {/* Display month name and year */}
                         <td>{MONTHS.find(m => m.value === salary.month)?.label} {years.find(y => y.id === salary.year)?.year}</td>
                         <td>₹{salary.basic_salary}</td>
                         <td>₹{salary.hra}</td>
@@ -705,16 +819,25 @@ export function SalaryManagement() {
                         <td>{salary.absent_days}</td>
                         <td>₹{salary.deduction}</td>
                         <td><strong>₹{salary.net_salary}</strong></td>
+                        {/* Payment status badge - green for paid, yellow for unpaid */}
                         <td>
-                          <span className={`badge ${salary.payment_status === 'paid' ? 'bg-success' : 'bg-warning'}`}>
+                          <span className={`badge ${salary.payment_status === 'paid' ? '' : 'bg-warning'}`} style={{ backgroundColor: salary.payment_status === 'paid' ? '#2ecc71' : undefined }}>
                             {salary.payment_status.toUpperCase()}
                           </span>
                         </td>
+                        {/* Action buttons for view, edit and delete */}
                         <td>
                         <button
                           className="btn btn-sm shadow-sm me-1"
+                          onClick={() => handleView(salary)}
+                          style={{ background: '#3498db', color: 'white', border: 'none', borderRadius: '6px' }}
+                        >
+                          View
+                        </button>
+                        <button
+                          className="btn btn-sm shadow-sm me-1"
                           onClick={() => handleEdit(salary)}
-                          style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', border: 'none', borderRadius: '6px' }}
+                          style={{ background: '#9b59b6', color: 'white', border: 'none', borderRadius: '6px' }}
                         >
                           Edit
                         </button>

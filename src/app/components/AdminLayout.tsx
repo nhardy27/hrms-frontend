@@ -29,23 +29,30 @@ export function AdminLayout({ children, title = 'Admin Dashboard' }: AdminLayout
   return (
     <div className="min-vh-100 d-flex" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>
       {/* Sidebar */}
-      <div className={`text-white ${sidebarCollapsed ? 'collapsed-sidebar' : 'sidebar'}`} style={{
+      <div className={`${sidebarCollapsed ? 'collapsed-sidebar' : 'sidebar'}`} style={{
         width: sidebarCollapsed ? '80px' : '260px',
         transition: 'width 0.3s',
         position: 'fixed',
         height: '100vh',
         overflowY: 'auto',
         zIndex: 1000,
-        background: 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)'
+        background: '#ffffff',
+        borderRight: '1px solid #e9ecef'
       }}>
-        <div className="p-3 d-flex justify-content-between align-items-center" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-          {!sidebarCollapsed && <h5 className="mb-0"><i className="bi bi-building me-2"></i>HR System</h5>}
+        <div className="p-3 d-flex justify-content-between align-items-center" style={{ borderBottom: '1px solid #e9ecef' }}>
+          {!sidebarCollapsed && (
+            <div className="d-flex align-items-center gap-2">
+              <img src="/Logo.png" alt="HR System" style={{ height: '40px', objectFit: 'contain' }} />
+              <h5 className="mb-0" style={{ color: '#2c3e50' }}>HR System</h5>
+            </div>
+          )}
           <button 
-            className="btn btn-sm btn-outline-light" 
+            className="btn btn-sm btn-outline-dark" 
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             title={sidebarCollapsed ? 'Expand' : 'Collapse'}
+            style={{ marginLeft: sidebarCollapsed ? 'auto' : '0', marginRight: sidebarCollapsed ? 'auto' : '0' }}
           >
-            <i className={`bi bi-${sidebarCollapsed ? 'chevron-right' : 'chevron-left'}`}></i>
+            <i className="bi bi-layout-sidebar-inset"></i>
           </button>
         </div>
         
@@ -54,17 +61,17 @@ export function AdminLayout({ children, title = 'Admin Dashboard' }: AdminLayout
             <Link
               key={item.path}
               to={item.path}
-              className={`nav-link text-white rounded mb-2 d-flex align-items-center ${location.pathname === item.path ? '' : ''}`}
+              className={`nav-link text-dark rounded mb-2 d-flex align-items-center ${location.pathname === item.path ? '' : ''}`}
               style={{
                 padding: '12px 16px',
                 transition: 'all 0.2s',
                 textDecoration: 'none',
-                background: location.pathname === item.path ? 'rgba(255,255,255,0.2)' : 'transparent',
-                boxShadow: location.pathname === item.path ? '0 4px 12px rgba(0,0,0,0.15)' : 'none'
+                background: location.pathname === item.path ? '#f8f9fa' : 'transparent',
+                boxShadow: 'none'
               }}
               onMouseEnter={(e) => {
                 if (location.pathname !== item.path) {
-                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
+                  e.currentTarget.style.backgroundColor = '#f8f9fa';
                 }
               }}
               onMouseLeave={(e) => {
@@ -73,17 +80,21 @@ export function AdminLayout({ children, title = 'Admin Dashboard' }: AdminLayout
                 }
               }}
             >
-              <i className={`bi ${item.icon} fs-5`} style={{ minWidth: '24px' }}></i>
+              {item.icon === 'bi-speedometer2' ? (
+                <img src="/Dashboard.png" alt="Dashboard" style={{ width: '24px', height: '24px', objectFit: 'contain', minWidth: '24px' }} />
+              ) : (
+                <i className={`bi ${item.icon} fs-5`} style={{ minWidth: '24px' }}></i>
+              )}
               {!sidebarCollapsed && <span className="ms-3">{item.label}</span>}
             </Link>
           ))}
         </nav>
         
-        <div className="position-absolute bottom-0 w-100 p-3" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+        <div className="position-absolute bottom-0 w-100 p-3" style={{ borderTop: '1px solid #e9ecef' }}>
           <button 
-            className="btn w-100 d-flex align-items-center justify-content-center text-white" 
+            className="btn w-100 d-flex align-items-center justify-content-center btn-outline-dark" 
             onClick={handleLogout}
-            style={{ background: 'rgba(255,255,255,0.2)', border: 'none' }}
+            style={{ border: '1px solid #dee2e6' }}
           >
             <i className="bi bi-box-arrow-right"></i>
             {!sidebarCollapsed && <span className="ms-2">Logout</span>}
@@ -93,11 +104,11 @@ export function AdminLayout({ children, title = 'Admin Dashboard' }: AdminLayout
 
       {/* Main Content */}
       <div className="flex-grow-1" style={{ marginLeft: sidebarCollapsed ? '80px' : '260px', transition: 'margin-left 0.3s' }}>
-        <nav className="navbar navbar-expand-lg shadow-sm" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+        <nav className="navbar navbar-expand-lg shadow-sm" style={{ background: '#ffffff', borderBottom: '1px solid #e9ecef' }}>
           <div className="container-fluid">
-            <span className="navbar-brand fw-bold text-white">{title}</span>
+            <span className="navbar-brand fw-bold" style={{ color: '#2c3e50' }}>{title}</span>
             <div className="navbar-nav ms-auto">
-              <span className="nav-link text-white"><i className="bi bi-person-circle me-2"></i>Admin</span>
+              <span className="nav-link" style={{ color: '#2c3e50' }}><i className="bi bi-person-circle me-2"></i>Admin</span>
             </div>
           </div>
         </nav>
