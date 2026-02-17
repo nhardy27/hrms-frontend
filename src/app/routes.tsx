@@ -7,9 +7,11 @@ import {
   EmployeeForm,
   EmployeeList,
   LeaveManagement,
-  SalaryManagement
+  SalaryManagement,
+  SalarySlip
 } from "./pages/admin";
 import { EmployeeDashboard } from "./pages/employee";
+import { EmployeeSalarySlip } from "./pages/employee/EmployeeSalarySlip";
 import Login from "./pages/Login";
 
 export const router = createBrowserRouter([
@@ -63,6 +65,14 @@ export const router = createBrowserRouter([
   {
     path: "/salary-management",
     Component: SalaryManagement,
+  },
+  {
+    path: "/salary-slip/:id",
+    Component: SalarySlip,
+  },
+  {
+    path: "/employee-salary-slip/:id",
+    Component: EmployeeSalarySlip,
   },
 
   {

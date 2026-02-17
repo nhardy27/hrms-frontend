@@ -1,306 +1,351 @@
+// React hooks for state management and side effects
 import { useState, useEffect } from "react";
-import { useNavigate, Link, useLocation } from "react-router-dom";
-import toast, { Toaster } from 'react-hot-toast';
+// Router hooks for navigation and routing
+import { useNavigate } from "react-router-dom";
+// Toast notifications for user feedback
+import toast, { Toaster } from "react-hot-toast";
+// API configuration
 import config from "../../../config/global.json";
-import { makeAuthenticatedRequest, fetchAllPages } from '../../../utils/apiUtils';
+// Utility function for authenticated API calls
+import { makeAuthenticatedRequest } from "../../../utils/apiUtils";
+// Reusable Admin Layout component
+import { AdminLayout } from "../../components/AdminLayout";
 
 export function AdminDashboard() {
+  // Hook to programmatically navigate between routes
   const navigate = useNavigate();
-  const location = useLocation();
+
+  // State to store dashboard statistics from API
   const [stats, setStats] = useState({ 
     totalEmployees: 0, 
     totalDepartments: 0,
-    presentToday: 0
+    presentToday: 0,
+    pendingLeaves: 0,
+    paidSalaries: 0,
+    unpaidSalaries: 0
   });
+
+  // Loading state for data fetching
   const [loading, setLoading] = useState(true);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  const menuItems = [
-    { path: '/admin-dashboard', icon: 'bi-speedometer2', label: 'Dashboard' },
-    { path: '/employees', icon: 'bi-people', label: 'Employees' },
-    { path: '/departments', icon: 'bi-building', label: 'Departments' },
-    { path: '/mark-attendance', icon: 'bi-calendar-check', label: 'Mark Attendance' },
-    { path: '/leave-management', icon: 'bi-calendar-x', label: 'Leave Management' },
-    { path: '/salary-management', icon: 'bi-cash-coin', label: 'Salary Management' },
-  ];
-
+  /* ============================
+      AUTH + ADMIN CHECK
+     ============================ */
+  // Effect runs on component mount to verify authentication and admin access
   useEffect(() => {
-    const user = localStorage.getItem('user');
-    console.log('Admin Dashboard - User from localStorage:', user);
-    
+    // Get user data from localStorage
+    const user = localStorage.getItem("user");
+
+    // If no user found, redirect to login
     if (!user) {
-      console.log('No user found, redirecting to login');
-      navigate('/login');
+      navigate("/login");
       return;
     }
-    
-    const userData = JSON.parse(user);
-    console.log('Admin Dashboard - Parsed user data:', userData);
-    console.log('Admin Dashboard - is_superuser:', userData.is_superuser);
-    console.log('Admin Dashboard - is_staff:', userData.is_staff);
-    
-    if (!(userData.is_superuser === true || (userData.is_staff === true && userData.username === 'admin'))) {
-      console.log('Access denied - not admin user');
-      toast.error('Access denied. Only admin users can access this page.');
-      navigate('/employee-dashboard');
-      return;
-    }
-    
-    console.log('Admin access granted');
-    fetchStats();
-  }, []);
 
-  const fetchStats = async () => {
-    setLoading(true);
-    
     try {
-      const [allEmployees, allDepartments] = await Promise.all([
-        fetchAllPages(`${config.api.host}${config.api.user}`),
-        fetchAllPages(`${config.api.host}${config.api.department}`)
-      ]);
-      
-      const regularEmployees = allEmployees.filter((emp: any) => 
-        !emp.is_superuser && emp.username !== 'admin'
-      );
-      
-      setStats(prev => ({ 
-        ...prev, 
-        totalEmployees: regularEmployees.length,
-        totalDepartments: allDepartments.length
-      }));
+      // Parse user data from JSON string
+      const userData = JSON.parse(user);
 
-      const allAttendances = await fetchAllPages(`${config.api.host}${config.api.attendance}`);
-      const today = new Date().toISOString().split('T')[0];
-      const todayAttendances = allAttendances.filter((att: any) => att.date === today);
-      
-      const presentToday = todayAttendances.filter((att: any) => {
-        if (!att.check_in) return false;
-        
-        if (att.total_hours) {
-          const [hours, minutes, seconds] = att.total_hours.split(':').map(Number);
-          const totalHours = hours + minutes / 60 + seconds / 3600;
-          return totalHours >= 7;
-        }
-        
-        if (att.check_in && !att.check_out) {
-          return true;
-        }
-        
-        if (att.check_in && att.check_out) {
-          const checkIn = new Date(`1970-01-01T${att.check_in}`);
-          const checkOut = new Date(`1970-01-01T${att.check_out}`);
-          const totalHours = (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60);
-          return totalHours >= 7;
-        }
-        
-        return false;
-      }).length;
-      
-      setStats(prev => ({ 
-        ...prev, 
-        presentToday: presentToday
-      }));
-      
+      // Check if user has admin privileges
+      const isAdmin =
+        userData.is_superuser === true ||
+        (userData.is_staff === true && userData.username === "admin");
+
+      // If not admin, show error and redirect to employee dashboard
+      if (!isAdmin) {
+        toast.error("Access denied. Only admin users can access this page.");
+        navigate("/employee-dashboard");
+        return;
+      }
+
+      // If admin, fetch dashboard statistics
+      fetchDashboardStats();
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      console.error("Error parsing user data:", error);
+      navigate("/login");
+    }
+  }, [navigate]);
+
+  // Function to fetch dashboard statistics from API
+  const fetchDashboardStats = async () => {
+    setLoading(true);
+
+    try {
+      // Make authenticated API request to get dashboard data
+      const response = await makeAuthenticatedRequest(
+        `${config.api.host}${config.api.adminDashboard}`
+      );
+
+      if (response.ok) {
+        // Parse response and update stats state
+        const data = await response.json();
+        setStats({
+          totalEmployees: data.total_employees || 0,
+          totalDepartments: data.total_departments || 0,
+          presentToday: data.present_today || 0,
+          pendingLeaves: data.pending_leaves || 0,
+          paidSalaries: data.total_paid_salaries || 0,
+          unpaidSalaries: data.total_unpaid_salaries || 0
+        });
+      } else {
+        toast.error("Failed to load dashboard data");
+      }
+    } catch (error) {
+      console.error("Admin dashboard error:", error);
+      toast.error("Failed to load dashboard data");
     } finally {
+      // Always set loading to false when done
       setLoading(false);
     }
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate('/login');
-  };
+  // Calculate attendance percentage based on present employees
+  const attendancePercentage =
+    stats.totalEmployees > 0
+      ? Math.round((stats.presentToday / stats.totalEmployees) * 100)
+      : 0;
 
   return (
-    <div className="min-vh-100 bg-light d-flex">
+    <AdminLayout title="Admin Dashboard">
+      {/* Toast notification container */}
       <Toaster position="bottom-center" />
-      
-      {/* Sidebar */}
-      <div className={`text-white ${sidebarCollapsed ? 'collapsed-sidebar' : 'sidebar'}`} style={{
-        width: sidebarCollapsed ? '80px' : '260px',
-        transition: 'width 0.3s',
-        position: 'fixed',
-        height: '100vh',
-        overflowY: 'auto',
-        zIndex: 1000,
-        background: 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)'
-      }}>
-        <div className="p-3 d-flex justify-content-between align-items-center" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-          {!sidebarCollapsed && <h5 className="mb-0"><i className="bi bi-building me-2"></i>HR System</h5>}
-          <button 
-            className="btn btn-sm btn-outline-light" 
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            title={sidebarCollapsed ? 'Expand' : 'Collapse'}
-          >
-            <i className={`bi bi-${sidebarCollapsed ? 'chevron-right' : 'chevron-left'}`}></i>
-          </button>
-        </div>
-        
-        <nav className="nav flex-column p-2">
-          {menuItems.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`nav-link text-white rounded mb-2 d-flex align-items-center ${location.pathname === item.path ? '' : ''}`}
-              style={{
-                padding: '12px 16px',
-                transition: 'all 0.2s',
-                textDecoration: 'none',
-                background: location.pathname === item.path ? 'rgba(255,255,255,0.2)' : 'transparent',
-                boxShadow: location.pathname === item.path ? '0 4px 12px rgba(0,0,0,0.15)' : 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (location.pathname !== item.path) {
-                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (location.pathname !== item.path) {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <i className={`bi ${item.icon} fs-5`} style={{ minWidth: '24px' }}></i>
-              {!sidebarCollapsed && <span className="ms-3">{item.label}</span>}
-            </Link>
+
+      {/* Main dashboard content container */}
+      <div
+        className="container-fluid p-4"
+        style={{
+          background: "#ffffff",
+          minHeight: "calc(100vh - 56px)",
+        }}
+      >
+        {/* ================= Cards ================= */}
+        {/* First row of statistics cards */}
+        <div className="row g-4">
+          {[
+            {
+              title: "Total Departments",
+              value: stats.totalDepartments,
+              icon: "bi-building",
+              iconColor: "#3498db",
+              gradient: "#ffffff",
+              link: "/departments"
+            },
+            {
+              title: "Total Employees",
+              value: stats.totalEmployees,
+              icon: "bi-people",
+              iconColor: "#9b59b6",
+              gradient: "#ffffff",
+              link: "/employees"
+            },
+            {
+              title: "Present Today",
+              value: stats.presentToday,
+              icon: "bi-person-check",
+              iconColor: "#2ecc71",
+              gradient: "#ffffff",
+              link: "/mark-attendance"
+            },
+          ].map((card, index) => (
+            <div key={index} className="col-md-4">
+              {/* Clickable card with hover effect */}
+              <div
+                className="card border-0 shadow-lg"
+                style={{ 
+                  borderRadius: 20, 
+                  background: card.gradient,
+                  cursor: 'pointer',
+                  transform: 'scale(1)',
+                  transition: 'transform 0.2s'
+                }}
+                onClick={() => navigate(card.link)}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                <div className="card-body p-4 d-flex justify-content-between">
+                  <div>
+                    <h2 className="fw-bold" style={{ color: '#2c3e50' }}>
+                      {loading ? "..." : card.value}
+                    </h2>
+                    <p className="mb-0" style={{ color: '#7f8c8d' }}>{card.title}</p>
+                  </div>
+                  <i className={`bi ${card.icon} fs-1`} style={{ color: card.iconColor }} />
+                </div>
+              </div>
+            </div>
           ))}
-        </nav>
-        
-        <div className="position-absolute bottom-0 w-100 p-3" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-          <button 
-            className="btn w-100 d-flex align-items-center justify-content-center text-white" 
-            onClick={handleLogout}
-            style={{ background: 'rgba(255,255,255,0.2)', border: 'none' }}
-          >
-            <i className="bi bi-box-arrow-right"></i>
-            {!sidebarCollapsed && <span className="ms-2">Logout</span>}
-          </button>
         </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="flex-grow-1" style={{ marginLeft: sidebarCollapsed ? '80px' : '260px', transition: 'margin-left 0.3s' }}>
-        <nav className="navbar navbar-expand-lg shadow-sm" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-          <div className="container-fluid">
-            <span className="navbar-brand fw-bold text-white">Admin Dashboard</span>
-            <div className="navbar-nav ms-auto">
-              <span className="nav-link text-white"><i className="bi bi-person-circle me-2"></i>Admin</span>
-            </div>
-          </div>
-        </nav>
-
-        <div className="container-fluid p-4" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', minHeight: 'calc(100vh - 56px)' }}>
-          <div className="row g-4">
-            <div className="col-md-4">
-              <div className="card border-0 shadow-lg" style={{ borderRadius: '20px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', boxShadow: '0 10px 30px rgba(102, 126, 234, 0.3)' }}>
-                <div className="card-body text-white p-4">
-                  <div className="d-flex justify-content-between align-items-center">
-                    <div>
-                      <h2 className="fw-bold mb-1">{loading ? '...' : stats.totalEmployees}</h2>
-                      <p className="mb-0 opacity-75">Total Employees</p>
-                    </div>
-                    <div className="bg-white bg-opacity-25 rounded-circle p-3">
-                      <i className="bi bi-people fs-1"></i>
-                    </div>
-                  </div>
-                  <div className="mt-3 pt-3 border-top border-white border-opacity-25">
-                    <small className="opacity-75"><i className="bi bi-arrow-up me-1"></i>Active workforce</small>
-                  </div>
+        {/* Second row of statistics cards */}
+        <div className="row g-4 mt-2">
+          {/* Pending Leaves Card */}
+          <div className="col-md-4">
+            <div
+              className="card border-0 shadow-lg"
+              style={{ 
+                borderRadius: 20, 
+                background: "#ffffff",
+                cursor: 'pointer',
+                transform: 'scale(1)',
+                transition: 'transform 0.2s'
+              }}
+              onClick={() => navigate('/leave-management')}
+              onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+              onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+            >
+              <div className="card-body p-4 d-flex justify-content-between">
+                <div>
+                  <h2 className="fw-bold" style={{ color: '#2c3e50' }}>{loading ? "..." : stats.pendingLeaves}</h2>
+                  <p className="mb-0" style={{ color: '#7f8c8d' }}>Pending Leaves</p>
                 </div>
-              </div>
-            </div>
-            
-            <div className="col-md-4">
-              <div className="card border-0 shadow-lg" style={{ borderRadius: '20px', background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', boxShadow: '0 10px 30px rgba(240, 147, 251, 0.3)' }}>
-                <div className="card-body text-white p-4">
-                  <div className="d-flex justify-content-between align-items-center">
-                    <div>
-                      <h2 className="fw-bold mb-1">{loading ? '...' : stats.totalDepartments}</h2>
-                      <p className="mb-0 opacity-75">Total Departments</p>
-                    </div>
-                    <div className="bg-white bg-opacity-25 rounded-circle p-3">
-                      <i className="bi bi-building fs-1"></i>
-                    </div>
-                  </div>
-                  <div className="mt-3 pt-3 border-top border-white border-opacity-25">
-                    <small className="opacity-75"><i className="bi bi-diagram-3 me-1"></i>Organization units</small>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="col-md-4">
-              <div className="card border-0 shadow-lg" style={{ borderRadius: '20px', background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', boxShadow: '0 10px 30px rgba(79, 172, 254, 0.3)' }}>
-                <div className="card-body text-white p-4">
-                  <div className="d-flex justify-content-between align-items-center">
-                    <div>
-                      <h2 className="fw-bold mb-1">{loading ? '...' : stats.presentToday}</h2>
-                      <p className="mb-0 opacity-75">Present Today</p>
-                    </div>
-                    <div className="bg-white bg-opacity-25 rounded-circle p-3">
-                      <i className="bi bi-person-check fs-1"></i>
-                    </div>
-                  </div>
-                  <div className="mt-3 pt-3 border-top border-white border-opacity-25">
-                    <small className="opacity-75"><i className="bi bi-calendar-check me-1"></i>{stats.totalEmployees > 0 ? Math.round((stats.presentToday/stats.totalEmployees)*100) : 0}% attendance rate</small>
-                  </div>
-                </div>
+                <i className="bi bi-calendar-x fs-1" style={{ color: '#e74c3c' }} />
               </div>
             </div>
           </div>
+          {/* Paid Salaries Card */}
+          <div className="col-md-4">
+            <div
+              className="card border-0 shadow-lg"
+              style={{ 
+                borderRadius: 20, 
+                background: "#ffffff",
+                cursor: 'pointer',
+                transform: 'scale(1)',
+                transition: 'transform 0.2s'
+              }}
+              onClick={() => navigate('/salary-management')}
+              onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+              onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+            >
+              <div className="card-body p-4 d-flex justify-content-between">
+                <div>
+                  <h2 className="fw-bold" style={{ color: '#2c3e50' }}>{loading ? "..." : stats.paidSalaries}</h2>
+                  <p className="mb-0" style={{ color: '#7f8c8d' }}>Paid Salaries</p>
+                </div>
+                <i className="bi bi-cash-coin fs-1" style={{ color: '#27ae60' }} />
+              </div>
+            </div>
+          </div>
+          {/* Unpaid Salaries Card */}
+          <div className="col-md-4">
+            <div
+              className="card border-0 shadow-lg"
+              style={{ 
+                borderRadius: 20, 
+                background: "#ffffff",
+                cursor: 'pointer',
+                transform: 'scale(1)',
+                transition: 'transform 0.2s'
+              }}
+              onClick={() => navigate('/salary-management')}
+              onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+              onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+            >
+              <div className="card-body p-4 d-flex justify-content-between">
+                <div>
+                  <h2 className="fw-bold" style={{ color: '#2c3e50' }}>{loading ? "..." : stats.unpaidSalaries}</h2>
+                  <p className="mb-0" style={{ color: '#7f8c8d' }}>Unpaid Salaries</p>
+                </div>
+                <i className="bi bi-exclamation-triangle fs-1" style={{ color: '#f39c12' }} />
+              </div>
+            </div>
+          </div>
+        </div>
 
-          <div className="row g-4 mt-2">
-            <div className="col-md-6">
-              <div className="card border-0 shadow-lg" style={{ borderRadius: '20px', height: '300px', background: 'white', boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)' }}>
-                <div className="card-body p-4">
-                  <h5 className="fw-bold mb-4" style={{ color: '#667eea' }}><i className="bi bi-graph-up me-2"></i>Attendance Overview</h5>
-                  <div className="d-flex align-items-center justify-content-center" style={{ height: '200px' }}>
+        {/* ================= Attendance Overview ================= */}
+        {/* Visual representation of today's attendance with circular progress */}
+        <div className="row g-4 mt-2">
+          <div className="col-md-12">
+            <div className="card border-0 shadow-lg" style={{ borderRadius: 20 }}>
+              <div className="card-body p-4">
+                <h5 className="fw-bold mb-4" style={{ color: '#2c3e50' }}>
+                  <i className="bi bi-graph-up me-2"></i>Today's Attendance Overview
+                </h5>
+                <div className="d-flex align-items-center justify-content-around">
+                  {/* Circular progress chart showing attendance percentage */}
+                  <div className="text-center">
+                    <div className="position-relative d-inline-block">
+                      <svg width="180" height="180">
+                        {/* Background circle */}
+                        <circle cx="90" cy="90" r="70" fill="none" stroke="#e9ecef" strokeWidth="18"/>
+                        {/* Progress circle - length based on attendance percentage */}
+                        <circle cx="90" cy="90" r="70" fill="none" stroke="#3498db" strokeWidth="18" 
+                          strokeDasharray={`${attendancePercentage * 4.4} 440`}
+                          strokeLinecap="round" transform="rotate(-90 90 90)"/>
+                      </svg>
+                      {/* Percentage text in center of circle */}
+                      <div className="position-absolute top-50 start-50 translate-middle">
+                        <h1 className="fw-bold mb-0" style={{ color: '#2c3e50', fontSize: '2.5rem' }}>{attendancePercentage}%</h1>
+                        <small className="text-muted">Attendance Rate</small>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Attendance breakdown: Present, Absent, Total */}
+                  <div className="d-flex gap-5">
+                    {/* Present employees */}
                     <div className="text-center">
-                      <div className="position-relative d-inline-block">
-                        <svg width="180" height="180">
-                          <circle cx="90" cy="90" r="70" fill="none" stroke="#e9ecef" strokeWidth="20"/>
-                          <circle cx="90" cy="90" r="70" fill="none" stroke="#4facfe" strokeWidth="20" 
-                            strokeDasharray={`${stats.totalEmployees > 0 ? (stats.presentToday/stats.totalEmployees)*440 : 0} 440`}
-                            strokeLinecap="round" transform="rotate(-90 90 90)"/>
-                        </svg>
-                        <div className="position-absolute top-50 start-50 translate-middle">
-                          <h2 className="fw-bold mb-0" style={{ color: '#667eea' }}>{stats.totalEmployees > 0 ? Math.round((stats.presentToday/stats.totalEmployees)*100) : 0}%</h2>
-                          <small style={{ color: '#6c757d' }}>Present</small>
-                        </div>
+                      <div className="mb-2" style={{ width: 80, height: 80, borderRadius: '50%', background: '#2ecc71', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <i className="bi bi-person-check fs-1 text-white"></i>
                       </div>
+                      <h3 className="fw-bold mb-0" style={{ color: '#2c3e50' }}>{stats.presentToday}</h3>
+                      <small className="text-muted">Present</small>
+                    </div>
+                    {/* Absent employees (calculated) */}
+                    <div className="text-center">
+                      <div className="mb-2" style={{ width: 80, height: 80, borderRadius: '50%', background: '#9b59b6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <i className="bi bi-person-x fs-1 text-white"></i>
+                      </div>
+                      <h3 className="fw-bold mb-0" style={{ color: '#2c3e50' }}>{stats.totalEmployees - stats.presentToday}</h3>
+                      <small className="text-muted">Absent</small>
+                    </div>
+                    {/* Total employees */}
+                    <div className="text-center">
+                      <div className="mb-2" style={{ width: 80, height: 80, borderRadius: '50%', background: '#3498db', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <i className="bi bi-people fs-1 text-white"></i>
+                      </div>
+                      <h3 className="fw-bold mb-0" style={{ color: '#2c3e50' }}>{stats.totalEmployees}</h3>
+                      <small className="text-muted">Total</small>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
 
-            <div className="col-md-6">
-              <div className="card border-0 shadow-lg" style={{ borderRadius: '20px', height: '300px', background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', boxShadow: '0 10px 30px rgba(250, 112, 154, 0.3)' }}>
-                <div className="card-body p-4 text-white">
-                  <h5 className="fw-bold mb-4"><i className="bi bi-bar-chart-fill me-2"></i>Today's Summary</h5>
-                  <div className="row h-75">
-                    <div className="col-4 text-center d-flex flex-column justify-content-center">
-                      <div className="bg-white bg-opacity-25 rounded-circle p-3 mx-auto mb-2" style={{ width: '70px', height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <i className="bi bi-person-check fs-2"></i>
+        {/* ================= Monthly Summary ================= */}
+        {/* Summary card showing current month statistics */}
+        <div className="row g-4 mt-2">
+          <div className="col-md-12">
+            <div className="card border-0 shadow-lg" style={{ borderRadius: 20 }}>
+              <div className="card-body p-4">
+                <h5 className="fw-bold mb-4" style={{ color: '#2c3e50' }}>
+                  <i className="bi bi-calendar-month me-2"></i>This Month Summary - {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </h5>
+                <div className="row g-3">
+                  {/* Total working days in current month */}
+                  <div className="col-md-6">
+                    <div className="p-3 rounded" style={{ background: '#f8f9fa' }}>
+                      <div className="d-flex align-items-center justify-content-between">
+                        <div>
+                          <small className="text-muted d-block">Total Working Days</small>
+                          {/* Calculate last day of current month */}
+                          <h4 className="fw-bold mb-0" style={{ color: '#2c3e50' }}>{new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()}</h4>
+                        </div>
+                        <i className="bi bi-calendar3 fs-2" style={{ color: '#e67e22' }}></i>
                       </div>
-                      <h3 className="fw-bold mb-0">{stats.presentToday}</h3>
-                      <small className="opacity-75">Present</small>
                     </div>
-                    <div className="col-4 text-center d-flex flex-column justify-content-center">
-                      <div className="bg-white bg-opacity-25 rounded-circle p-3 mx-auto mb-2" style={{ width: '70px', height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <i className="bi bi-person-x fs-2"></i>
+                  </div>
+                  {/* Average attendance percentage */}
+                  <div className="col-md-6">
+                    <div className="p-3 rounded" style={{ background: '#f8f9fa' }}>
+                      <div className="d-flex align-items-center justify-content-between">
+                        <div>
+                          <small className="text-muted d-block">Avg Attendance</small>
+                          <h4 className="fw-bold mb-0" style={{ color: '#2c3e50' }}>{attendancePercentage}%</h4>
+                        </div>
+                        <i className="bi bi-graph-up-arrow fs-2" style={{ color: '#16a085' }}></i>
                       </div>
-                      <h3 className="fw-bold mb-0">{stats.totalEmployees - stats.presentToday}</h3>
-                      <small className="opacity-75">Absent</small>
-                    </div>
-                    <div className="col-4 text-center d-flex flex-column justify-content-center">
-                      <div className="bg-white bg-opacity-25 rounded-circle p-3 mx-auto mb-2" style={{ width: '70px', height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <i className="bi bi-building fs-2"></i>
-                      </div>
-                      <h3 className="fw-bold mb-0">{stats.totalDepartments}</h3>
-                      <small className="opacity-75">Departments</small>
                     </div>
                   </div>
                 </div>
@@ -309,6 +354,6 @@ export function AdminDashboard() {
           </div>
         </div>
       </div>
-    </div>
+    </AdminLayout>
   );
 }

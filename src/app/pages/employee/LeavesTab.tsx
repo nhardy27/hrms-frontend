@@ -14,6 +14,8 @@ export function LeavesTab({ leaves, onLeaveApplied }: LeavesTabProps) {
   const [leaveForm, setLeaveForm] = useState({ from_date: '', to_date: '', reason: '' });
   const [submitting, setSubmitting] = useState(false);
 
+  const today = new Date().toISOString().split('T')[0];
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -69,12 +71,13 @@ export function LeavesTab({ leaves, onLeaveApplied }: LeavesTabProps) {
   };
 
   return (
-    <div className="card">
-      <div className="card-header d-flex justify-content-between align-items-center">
-        <h5 className="mb-0"><i className="bi bi-calendar-x me-2"></i>Leave Applications</h5>
+    <div className="card shadow-sm border-0" style={{ background: '#ffffff' }}>
+      <div className="card-header d-flex justify-content-between align-items-center" style={{ background: '#f8f9fa', borderBottom: '1px solid #e9ecef' }}>
+        <h5 className="mb-0" style={{ color: '#2c3e50' }}><i className="bi bi-calendar-x me-2"></i>Leave Applications</h5>
         <button 
-          className="btn btn-primary btn-sm" 
+          className="btn btn-sm text-white" 
           onClick={() => setShowForm(!showForm)}
+          style={{ background: '#2c3e50', border: 'none' }}
         >
           <i className="bi bi-plus-circle me-2"></i>
           {showForm ? 'Cancel' : 'Apply New Leave'}
@@ -82,42 +85,44 @@ export function LeavesTab({ leaves, onLeaveApplied }: LeavesTabProps) {
       </div>
       <div className="card-body">
         {showForm && (
-          <div className="card mb-4 shadow-sm" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-            <div className="card-body text-white">
+          <div className="card mb-4 shadow-sm border-0" style={{ background: '#ffffff' }}>
+            <div className="card-body">
               <div className="d-flex align-items-center mb-3">
-                <div className="bg-white rounded-circle p-2 me-3">
-                  <i className="bi bi-calendar-plus fs-4 text-primary"></i>
+                <div className="rounded-circle p-2 me-3" style={{ background: '#f8f9fa' }}>
+                  <i className="bi bi-calendar-plus fs-4" style={{ color: '#2c3e50' }}></i>
                 </div>
-                <h5 className="mb-0">New Leave Application</h5>
+                <h5 className="mb-0" style={{ color: '#2c3e50' }}>New Leave Application</h5>
               </div>
               <form onSubmit={handleSubmit}>
                 <div className="row g-3">
                   <div className="col-md-6">
-                    <label className="form-label fw-bold">
+                    <label className="form-label fw-bold" style={{ color: '#2c3e50' }}>
                       <i className="bi bi-calendar-event me-2"></i>From Date
                     </label>
                     <input
                       type="date"
                       className="form-control form-control-lg"
                       value={leaveForm.from_date}
+                      min={today}
                       onChange={(e) => setLeaveForm({ ...leaveForm, from_date: e.target.value })}
                       required
                     />
                   </div>
                   <div className="col-md-6">
-                    <label className="form-label fw-bold">
+                    <label className="form-label fw-bold" style={{ color: '#2c3e50' }}>
                       <i className="bi bi-calendar-check me-2"></i>To Date
                     </label>
                     <input
                       type="date"
                       className="form-control form-control-lg"
                       value={leaveForm.to_date}
+                      min={leaveForm.from_date || today}
                       onChange={(e) => setLeaveForm({ ...leaveForm, to_date: e.target.value })}
                       required
                     />
                   </div>
                   <div className="col-12">
-                    <label className="form-label fw-bold">
+                    <label className="form-label fw-bold" style={{ color: '#2c3e50' }}>
                       <i className="bi bi-chat-left-text me-2"></i>Reason for Leave
                     </label>
                     <textarea
@@ -133,7 +138,7 @@ export function LeavesTab({ leaves, onLeaveApplied }: LeavesTabProps) {
                     <div className="d-flex gap-2 justify-content-end">
                       <button 
                         type="button" 
-                        className="btn btn-light btn-lg px-4"
+                        className="btn btn-outline-dark btn-lg px-4"
                         onClick={() => {
                           setShowForm(false);
                           setLeaveForm({ from_date: '', to_date: '', reason: '' });
@@ -143,8 +148,9 @@ export function LeavesTab({ leaves, onLeaveApplied }: LeavesTabProps) {
                       </button>
                       <button 
                         type="submit" 
-                        className="btn btn-success btn-lg px-4" 
+                        className="btn text-white btn-lg px-4" 
                         disabled={submitting}
+                        style={{ background: '#2c3e50', border: 'none' }}
                       >
                         <i className="bi bi-send-fill me-2"></i>
                         {submitting ? 'Submitting...' : 'Submit Application'}

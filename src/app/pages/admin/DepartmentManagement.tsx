@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import toast, { Toaster } from 'react-hot-toast';
 import config from "../../../config/global.json";
 import { AdminLayout } from '../../components/AdminLayout';
@@ -13,7 +12,6 @@ interface Department {
 }
 
 export function DepartmentPage() {
-  const navigate = useNavigate();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
@@ -197,14 +195,14 @@ export function DepartmentPage() {
     <AdminLayout title="Department Management">
       <Toaster position="bottom-center" />
       <div className="container-fluid p-4">
-        <div className="card border-0 shadow-lg mb-4" style={{ borderRadius: '15px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+        <div className="card border-0 shadow-lg mb-4" style={{ borderRadius: '15px', background: '#ffffff' }}>
           <div className="card-body p-3">
-            <div className="d-flex justify-content-between align-items-center text-white">
-              <h4 className="mb-0"><i className="bi bi-building-fill me-2"></i>Departments</h4>
+            <div className="d-flex justify-content-between align-items-center">
+              <h4 className="mb-0" style={{ color: '#2c3e50' }}><i className="bi bi-building-fill me-2"></i>Departments</h4>
               <button 
-                className="btn text-white px-4 shadow"
+                className="btn px-4 shadow"
                 onClick={() => setShowForm(true)}
-                style={{ background: 'rgba(255,255,255,0.2)', borderRadius: '8px', border: 'none' }}
+                style={{ background: '#2c3e50', color: 'white', borderRadius: '8px', border: 'none' }}
               >
                 <i className="bi bi-plus-circle me-2"></i>
                 Add Department
@@ -215,7 +213,7 @@ export function DepartmentPage() {
 
         {showForm && (
           <div className="card border-0 shadow-lg mb-4" style={{ borderRadius: '15px' }}>
-            <div className="card-header" style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', borderRadius: '15px 15px 0 0', border: 'none' }}>
+            <div className="card-header" style={{ background: '#2c3e50', borderRadius: '15px 15px 0 0', border: 'none' }}>
               <h5 className="mb-0 text-white"><i className="bi bi-pencil-square me-2"></i>{editingDepartment ? "Edit Department" : "Add New Department"}</h5>
             </div>
             <div className="card-body">
@@ -244,10 +242,10 @@ export function DepartmentPage() {
                   </div>
                 </div>
                 <div className="mt-3">
-                  <button type="submit" className="btn text-white px-4 shadow me-2" disabled={loading} style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '8px', border: 'none' }}>
+                  <button type="submit" className="btn px-4 shadow me-2" disabled={loading} style={{ background: '#2c3e50', color: 'white', borderRadius: '8px', border: 'none' }}>
                     {loading ? 'Saving...' : (editingDepartment ? "Update" : "Create")} Department
                   </button>
-                  <button type="button" className="btn btn-secondary px-4 shadow" onClick={resetForm} style={{ borderRadius: '8px' }}>
+                  <button type="button" className="btn px-4 shadow" onClick={resetForm} style={{ background: '#2c3e50', color: 'white', borderRadius: '8px', border: 'none' }}>
                     Cancel
                   </button>
                 </div>
@@ -274,7 +272,7 @@ export function DepartmentPage() {
                     <tr key={department.id}>
                       <td className="fw-semibold">{department.name}</td>
                       <td>
-                        <span className={`badge bg-${department.status ? 'success' : 'secondary'}`}>
+                        <span className={`badge ${department.status ? '' : 'bg-secondary'}`} style={{ backgroundColor: department.status ? '#2ecc71' : undefined }}>
                           {department.status ? 'Active' : 'Inactive'}
                         </span>
                       </td>
@@ -284,7 +282,7 @@ export function DepartmentPage() {
                         <button 
                           className="btn btn-sm shadow-sm me-2"
                           onClick={() => handleEdit(department)}
-                          style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', border: 'none', borderRadius: '6px' }}
+                          style={{ background: '#9b59b6', color: 'white', border: 'none', borderRadius: '6px' }}
                         >
                           <i className="bi bi-pencil"></i> Edit
                         </button>

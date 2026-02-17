@@ -1,10 +1,12 @@
+// React hooks for state management and side effects
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import toast, { Toaster } from 'react-hot-toast';
-import config from "../../../config/global.json";
+import toast, { Toaster } from 'react-hot-toast'; // Toast notifications
+import config from "../../../config/global.json"; // API configuration
 import { AdminLayout } from '../../components/AdminLayout';
 import { fetchAllPages, makeAuthenticatedRequest } from '../../../utils/apiUtils';
 
+// Employee data structure from API
 interface Employee {
   id: string;
   emp_code: string;
@@ -15,9 +17,10 @@ interface Employee {
   is_active: boolean;
 }
 
+// Attendance record structure from API
 interface AttendanceData {
   id: string;
-  user: number;
+  user: number; // Employee ID
   date: string;
   check_in?: string;
   check_out?: string;
@@ -25,6 +28,7 @@ interface AttendanceData {
   attendance_status: string;
 }
 
+// Manual time entry for updating attendance
 interface ManualTime {
   check_in: string;
   check_out: string;
@@ -35,14 +39,16 @@ interface ManualTime {
 export function MarkAttendance() {
   const navigate = useNavigate();
 
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [existingAttendance, setExistingAttendance] = useState<AttendanceData[]>([]);
-  const [manualTimes, setManualTimes] = useState<Record<string, ManualTime>>({});
+  // State variables
+  const [employees, setEmployees] = useState<Employee[]>([]); // List of all active employees
+  const [existingAttendance, setExistingAttendance] = useState<AttendanceData[]>([]); // Attendance records for selected date
+  const [manualTimes, setManualTimes] = useState<Record<string, ManualTime>>({}); // Manual time overrides by employee ID
   const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0]
+    new Date().toISOString().split("T")[0] // Default to today's date
   );
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // Loading state for save operation
 
+  // Initialize component on mount - check admin access and load data
   useEffect(() => {
     const initializeData = async () => {
       // Check if user is admin/superuser
@@ -53,6 +59,7 @@ export function MarkAttendance() {
       }
       
       const userData = JSON.parse(user);
+      // Only allow superusers or admin staff to access this page
       if (!(userData.is_superuser === true || (userData.is_staff === true && userData.username === 'admin'))) {
         toast.error('Access denied. Only admin users can access this page.');
         navigate('/employee-dashboard');
@@ -73,6 +80,7 @@ export function MarkAttendance() {
     });
   }, []);
 
+  // Reload attendance data when date changes
   useEffect(() => {
     if (employees.length > 0) {
       fetchEmployeesAndAttendance();
@@ -80,6 +88,7 @@ export function MarkAttendance() {
   }, [selectedDate]);
 
 
+  // Find attendance record for a specific employee on selected date
   const getEmployeeAttendance = (employeeId: string): AttendanceData | null => {
     const attendance = existingAttendance.find(att => 
       att.user.toString() === employeeId.toString()
@@ -89,11 +98,12 @@ export function MarkAttendance() {
     return attendance;
   };
 
+  // Fetch all employees and their attendance records from API
   const fetchEmployeesAndAttendance = async () => {
     try {
       console.log('Fetching employees from User API...');
       
-      // Fetch all pages of employees from User API
+      // Fetch all pages of employees from User API (handles pagination)
       let allEmployees: any[] = [];
       let nextUrl = `${config.api.host}${config.api.user}`;
       
@@ -114,11 +124,12 @@ export function MarkAttendance() {
       
       console.log('All employees from all pages:', allEmployees.length);
       
+      // Filter active employees (exclude admin) and format data
       const processedEmployees = allEmployees.filter((emp: any) => 
         emp.is_active && emp.username !== 'admin'
       ).map((emp: any) => ({
         id: emp.id.toString(),
-        emp_code: `EMP${emp.id.toString().padStart(3, '0')}`,
+        emp_code: `EMP${emp.id.toString().padStart(3, '0')}`, // Generate employee code
         first_name: emp.first_name || emp.username,
         last_name: emp.last_name || '',
         department: emp.department || '',
@@ -129,13 +140,13 @@ export function MarkAttendance() {
       console.log('Processed employees:', processedEmployees);
       setEmployees(processedEmployees);
       
-      // Fetch attendance data using fetchAllPages
+      // Fetch attendance data using fetchAllPages (handles pagination automatically)
       console.log('Fetching attendance data...');
       const allAttendanceRecords = await fetchAllPages(`${config.api.host}${config.api.attendance}`);
       
       console.log('All attendance records from all pages:', allAttendanceRecords.length);
       
-      // Filter attendance for selected date
+      // Filter attendance for selected date only
       const attendanceForDate = allAttendanceRecords.filter(
         (att: AttendanceData) => att.date === selectedDate
       );
@@ -150,6 +161,7 @@ export function MarkAttendance() {
 
 
 
+  // Handle manual time input changes for check-in/check-out
   const handleManualTimeChange = (employeeId: string, field: 'check_in' | 'check_out', value: string) => {
     console.log(`Manual time change for employee ${employeeId}: ${field} = ${value}`);
     setManualTimes(prev => ({
@@ -161,27 +173,28 @@ export function MarkAttendance() {
     }));
   };
 
+  // Save attendance records to database (create new or update existing)
   const handleSubmit = async () => {
     setLoading(true);
     try {
       console.log('Starting attendance save...');
       
-      // Get attendance status ID
+      // Get attendance statuses from API (Present, Half Day, Absent)
       const statusResponse = await makeAuthenticatedRequest(`${config.api.host}${config.api.attendanceStatus}`);
       if (!statusResponse.ok) {
         throw new Error('Failed to get attendance status');
       }
       const statusData = await statusResponse.json();
-      console.log('Status data:', statusData);
-      const presentStatus = (statusData.results || []).find((status: any) => status.present === true);
+      const statuses = statusData.results || [];
+      const presentStatus = statuses.find((s: any) => s.status?.toLowerCase() === 'present');
+      const halfDayStatus = statuses.find((s: any) => s.status?.toLowerCase() === 'halfday');
+      const absentStatus = statuses.find((s: any) => s.status?.toLowerCase() === 'absent');
       
       if (!presentStatus) {
         throw new Error('Present status not found');
       }
-      
-      console.log('Present status ID:', presentStatus.id);
 
-      // Save manual time entries - only process employees with manual time changes
+      // Process only employees with manual time changes
       let successCount = 0;
       let errorCount = 0;
       
@@ -200,7 +213,7 @@ export function MarkAttendance() {
         
         try {
           if (existingAttendance) {
-            // Update existing attendance
+            // UPDATE existing attendance record
             const updateData: any = {};
             if (manualTime.check_in) updateData.check_in = manualTime.check_in;
             if (manualTime.check_out) updateData.check_out = manualTime.check_out;
@@ -244,12 +257,16 @@ export function MarkAttendance() {
               errorCount++;
             }
           } else {
-            // Create new attendance record - only if we have check_in or check_out
+            // CREATE new attendance record
             if (!manualTime.check_in && !manualTime.check_out) {
               console.log(`No check-in or check-out time for ${emp.first_name} ${emp.last_name}`);
               continue;
             }
+            
+            // Calculate total_hours and auto-assign status
             let totalHours = null;
+            let statusId = presentStatus.id; // default
+            
             if (manualTime.check_in && manualTime.check_out) {
               const checkIn = new Date(`1970-01-01T${manualTime.check_in}`);
               const checkOut = new Date(`1970-01-01T${manualTime.check_out}`);
@@ -258,18 +275,28 @@ export function MarkAttendance() {
               const minutes = Math.floor((totalMs % (1000 * 60 * 60)) / (1000 * 60));
               const seconds = Math.floor((totalMs % (1000 * 60)) / 1000);
               totalHours = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+              
+              // Auto-assign status: >=7hrs = Present, 4-7hrs = Half Day, <4hrs = Absent
+              const totalHoursDecimal = hours + minutes / 60 + seconds / 3600;
+              if (totalHoursDecimal >= 7) {
+                statusId = presentStatus.id;
+              } else if (totalHoursDecimal >= 4 && halfDayStatus) {
+                statusId = halfDayStatus.id;
+              } else if (absentStatus) {
+                statusId = absentStatus.id;
+              }
             }
             
             const createData: Record<string, any> = {
               user: parseInt(emp.id),
               date: selectedDate,
-              attendance_status: presentStatus.id,
+              attendance_status: statusId,
               check_in: manualTime.check_in,
               check_out: manualTime.check_out,
               total_hours: totalHours
             };
             
-            // Remove null values
+            // Remove null/undefined values
             Object.keys(createData).forEach(key => {
               if (createData[key] === null || createData[key] === undefined) {
                 delete createData[key];
@@ -306,10 +333,10 @@ export function MarkAttendance() {
       
       console.log(`Attendance save complete. Success: ${successCount}, Errors: ${errorCount}`);
       
+      // Show success/error messages
       if (successCount > 0) {
         toast.success(`Attendance saved to database for ${successCount} employees`);
-        // Clear manual times after successful save
-        setManualTimes({});
+        setManualTimes({}); // Clear manual times after successful save
       }
       if (errorCount > 0) {
         toast.error(`Failed to save ${errorCount} employees to database`);
@@ -332,7 +359,7 @@ export function MarkAttendance() {
       <Toaster position="bottom-center" />
       <div className="container-fluid p-4">
         <div className="card border-0 shadow-lg" style={{ borderRadius: '15px' }}>
-          <div className="card-header d-flex justify-content-between align-items-center" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '15px 15px 0 0', border: 'none' }}>
+          <div className="card-header d-flex justify-content-between align-items-center" style={{ background: '#3498db', borderRadius: '15px 15px 0 0', border: 'none' }}>
             <h5 className="mb-0 text-white"><i className="bi bi-calendar-check-fill me-2"></i>Mark Employee Attendance</h5>
             <input
               type="date"
@@ -346,7 +373,7 @@ export function MarkAttendance() {
           <div className="card-body">
             <div className="row mb-3 g-3">
               <div className="col-md-6">
-                <div className="card border-0 shadow-sm" style={{ borderRadius: '12px', background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' }}>
+                <div className="card border-0 shadow-sm" style={{ borderRadius: '12px', background: '#0e0e0e' }}>
                   <div className="card-body text-center text-white">
                     <h4 className="fw-bold">{employees.length}</h4>
                     <p className="mb-0">Total Employees</p>
@@ -354,10 +381,11 @@ export function MarkAttendance() {
                 </div>
               </div>
               <div className="col-md-6">
-                <div className="card border-0 shadow-sm" style={{ borderRadius: '12px', background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)' }}>
+                <div className="card border-0 shadow-sm" style={{ borderRadius: '12px', background: '#0e0e0e' }}>
                   <div className="card-body text-center text-white">
                     <h4 className="fw-bold">
                       {(() => {
+                        // Calculate present count: employees with >=7 hours worked
                         console.log('=== Present Count Calculation ===');
                         console.log('existingAttendance:', existingAttendance);
                         console.log('selectedDate:', selectedDate);
@@ -375,12 +403,14 @@ export function MarkAttendance() {
                             total_hours: empAttendance?.total_hours
                           });
                           
+                          // Use API total_hours if available
                           if (empAttendance?.total_hours) {
                             const [hours, minutes, seconds] = empAttendance.total_hours.split(':').map(Number);
                             const calculatedHours = hours + minutes / 60 + seconds / 3600;
                             console.log(`  -> Calculated hours from total_hours: ${calculatedHours}`);
                             return calculatedHours >= 7;
                           } else if (checkInTime && checkOutTime) {
+                            // Calculate from check-in/check-out times
                             const checkIn = new Date(`1970-01-01T${checkInTime}`);
                             const checkOut = new Date(`1970-01-01T${checkOutTime}`);
                             const calculatedHours = (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60);
@@ -424,22 +454,22 @@ export function MarkAttendance() {
                     {employees.map(emp => {
                       const empAttendance = getEmployeeAttendance(emp.id);
                       
-                      // Calculate total hours - use API total_hours first, then calculate
+                      // Calculate total hours worked
                       let totalHours = 'N/A';
                       let calculatedHours = 0;
                       
-                      // Check manual times first, then existing attendance
+                      // Get check-in/check-out times (manual override or existing)
                       const manualTime = manualTimes[emp.id];
                       const checkInTime = manualTime?.check_in || empAttendance?.check_in;
                       const checkOutTime = manualTime?.check_out || empAttendance?.check_out;
                       
-                      // Use API total_hours if available
+                      // Use API total_hours if available, otherwise calculate
                       if (empAttendance?.total_hours) {
                         const [hours, minutes, seconds] = empAttendance.total_hours.split(':').map(Number);
                         calculatedHours = hours + minutes / 60 + seconds / 3600;
                         totalHours = `${hours}h ${minutes}m ${seconds}s`;
                       } else if (checkInTime && checkOutTime) {
-                        // Fallback to calculation if no API total_hours
+                        // Calculate from check-in/check-out times
                         const checkIn = new Date(`1970-01-01T${checkInTime}`);
                         const checkOut = new Date(`1970-01-01T${checkOutTime}`);
                         const totalMs = checkOut.getTime() - checkIn.getTime();
@@ -451,7 +481,7 @@ export function MarkAttendance() {
                         totalHours = `${hours}h ${minutes}m ${seconds}s`;
                       }
                       
-                      // Determine auto status based on hours
+                      // Determine auto status based on hours worked
                       let autoStatus = 'Absent';
                       let statusClass = 'bg-danger';
                       if (calculatedHours >= 7) {
@@ -472,7 +502,7 @@ export function MarkAttendance() {
                         <tr key={emp.id}>
                           <td><strong>{emp.id}</strong></td>
                           <td><strong>{emp.emp_code}</strong></td>
-                          <td>{emp.first_name} {emp.last_name}</td>
+                          <td><strong>{emp.first_name} {emp.last_name}</strong></td>
                           <td><span className="badge bg-secondary">{emp.department_name}</span></td>
                           <td>
                             <span className={`badge ${statusClass}`}>
@@ -549,9 +579,9 @@ export function MarkAttendance() {
                 </div>
                 <div>
                   <button
-                    className="btn btn-secondary px-4 shadow me-2"
+                    className="btn px-4 shadow me-2"
                     onClick={() => navigate("/admin-dashboard")}
-                    style={{ borderRadius: '8px' }}
+                    style={{ background: '#2b3d4f', color: 'white', borderRadius: '8px', border: 'none' }}
                   >
                     Cancel
                   </button>
@@ -559,7 +589,7 @@ export function MarkAttendance() {
                     className="btn text-white px-4 shadow"
                     onClick={handleSubmit}
                     disabled={loading}
-                    style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '8px', border: 'none' }}
+                    style={{ background: '#3498db', borderRadius: '8px', border: 'none' }}
                   >
                     <i className="bi bi-check-circle me-2"></i>
                     {loading ? "Saving..." : "Save Attendance"}

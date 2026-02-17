@@ -14,6 +14,8 @@ interface SalaryRecord {
   absent_days: number;
   half_days: number;
   deduction: string;
+  pf_percentage: string;
+  pf_amount: string;
   net_salary: string;
   payment_status: string;
 }
@@ -65,16 +67,28 @@ export function SalaryTab() {
     }
   };
 
+  const handleDownload = (salaryId: string) => {
+    window.open(`/employee-salary-slip/${salaryId}`, '_blank');
+  };
+
   if (loading) {
     return <div className="text-center py-4"><div className="spinner-border"></div></div>;
   }
 
+  const totalPF = salaries.reduce((sum, salary) => sum + parseFloat(salary.pf_amount || '0'), 0);
+
   return (
-    <div className="card">
-      <div className="card-header bg-primary text-white">
-        <h5 className="mb-0"><i className="bi bi-cash-stack me-2"></i>My Salary</h5>
+    <div className="card shadow-sm border-0" style={{ background: '#ffffff' }}>
+      <div className="card-header" style={{ background: '#f8f9fa', borderBottom: '1px solid #e9ecef' }}>
+        <h5 className="mb-0" style={{ color: '#2c3e50' }}><i className="bi bi-cash-stack me-2"></i>My Salary</h5>
       </div>
       <div className="card-body">
+        {salaries.length > 0 && (
+          <div className="alert alert-info mb-3" role="alert">
+            <i className="bi bi-piggy-bank me-2"></i>
+            <strong>PF Status:</strong> Total PF Amount: <strong>₹{totalPF.toFixed(2)}</strong>
+          </div>
+        )}
         {salaries.length === 0 ? (
           <p className="text-muted text-center">No salary records found</p>
         ) : (
@@ -88,9 +102,11 @@ export function SalaryTab() {
                   <th>Allowance</th>
                   <th>Present</th>
                   <th>Absent</th>
+                  <th>PF</th>
                   <th>Deduction</th>
                   <th>Net Salary</th>
                   <th>Status</th>
+                  <th>Download</th>
                 </tr>
               </thead>
               <tbody>
@@ -102,12 +118,22 @@ export function SalaryTab() {
                     <td>₹{parseFloat(salary.allowance).toFixed(2)}</td>
                     <td>{salary.present_days}</td>
                     <td>{salary.absent_days}</td>
+                    <td>₹{parseFloat(salary.pf_amount || '0').toFixed(2)}</td>
                     <td>₹{parseFloat(salary.deduction).toFixed(2)}</td>
                     <td className="fw-bold">₹{parseFloat(salary.net_salary).toFixed(2)}</td>
                     <td>
                       <span className={`badge ${salary.payment_status === 'paid' ? 'bg-success' : 'bg-warning'}`}>
                         {salary.payment_status.toUpperCase()}
                       </span>
+                    </td>
+                    <td>
+                      <button 
+                        className="btn btn-sm btn-primary"
+                        onClick={() => handleDownload(salary.id)}
+                        title="Download Salary Slip"
+                      >
+                        <i className="bi bi-download"></i>
+                      </button>
                     </td>
                   </tr>
                 ))}
