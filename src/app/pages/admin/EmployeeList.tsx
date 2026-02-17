@@ -21,6 +21,10 @@ interface Employee {
   updated_at: string;
   username?: string;
   is_superuser?: boolean;
+  address?: string;
+  bank_name?: string;
+  bank_account_number?: string;
+  ifsc_code?: string;
 }
 
 interface Department {
@@ -31,10 +35,12 @@ interface Department {
 
 export function EmployeeList() {
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -57,6 +63,28 @@ export function EmployeeList() {
       fetchEmployees();
     }
   }, [currentPage, departments]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchTerm) {
+        const filtered = employees.filter(emp => 
+          emp.emp_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          emp.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          emp.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          emp.department_name?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        setFilteredEmployees(filtered);
+        setTotalPages(Math.ceil(filtered.length / itemsPerPage));
+        setCurrentPage(1);
+      } else {
+        setFilteredEmployees(employees);
+        setTotalPages(Math.ceil(employees.length / itemsPerPage));
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, employees]);
 
   const fetchDepartments = async () => {
     try {
@@ -99,6 +127,7 @@ export function EmployeeList() {
       
       console.log('Final employees with departments:', employeesWithDepartments);
       setEmployees(employeesWithDepartments);
+      setFilteredEmployees(employeesWithDepartments);
       setTotalPages(Math.ceil(employeesWithDepartments.length / itemsPerPage));
     } catch (error) {
       console.error('Error fetching employees:', error);
@@ -139,13 +168,23 @@ export function EmployeeList() {
                 <h4 className="mb-1" style={{ color: '#2c3e50' }}><i className="bi bi-people-fill me-2"></i>Employees</h4>
                 <small className="opacity-75" style={{ color: '#7f8c8d' }}>
                   Total: {employees.length} employees | 
-                  Showing: {Math.min((currentPage - 1) * itemsPerPage + 1, employees.length)}-{Math.min(currentPage * itemsPerPage, employees.length)} of {employees.length}
+                  Showing: {Math.min((currentPage - 1) * itemsPerPage + 1, filteredEmployees.length)}-{Math.min(currentPage * itemsPerPage, filteredEmployees.length)} of {filteredEmployees.length}
                 </small>
               </div>
-              <Link to="/employees/add" className="btn px-4 shadow" style={{ background: '#3498db', color: 'white', borderRadius: '8px', border: 'none' }}>
-                <i className="bi bi-plus-circle me-2"></i>
-                Add Employee
-              </Link>
+              <div className="d-flex gap-2">
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Search employees..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{ width: '250px', borderRadius: '8px' }}
+                />
+                <Link to="/employees/add" className="btn px-4 shadow" style={{ background: '#3498db', color: 'white', borderRadius: '8px', border: 'none' }}>
+                  <i className="bi bi-plus-circle me-2"></i>
+                  Add Employee
+                </Link>
+              </div>
             </div>
           </div>
         </div>
@@ -153,57 +192,73 @@ export function EmployeeList() {
         <div className="card border-0 shadow-lg" style={{ borderRadius: '15px' }}>
           <div className="card-body">
             <div className="table-responsive">
-              <table className="table table-hover">
+              <table className="table table-hover align-middle">
                 <thead>
                   <tr>
-                    <th>ID</th>
-                    <th>Employee Code</th>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Department</th>
-                    <th>Status</th>
-                    <th>Actions</th>
+                    <th style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>ID</th>
+                    <th style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Employee Code</th>
+                    <th style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Name</th>
+                    <th style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Email</th>
+                    <th style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Department</th>
+                    <th style={{ verticalAlign: 'middle', minWidth: '150px', whiteSpace: 'nowrap' }}>Address</th>
+                    <th style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Bank Name</th>
+                    <th style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Account Number</th>
+                    <th style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>IFSC Code</th>
+                    <th style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Status</th>
+                    <th style={{ verticalAlign: 'middle', minWidth: '180px', whiteSpace: 'nowrap' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={7} className="text-center">Loading...</td>
+                      <td colSpan={11} className="text-center">Loading...</td>
                     </tr>
-                  ) : employees.length === 0 ? (
+                  ) : filteredEmployees.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="text-center">No employees found</td>
+                      <td colSpan={11} className="text-center">No employees found</td>
                     </tr>
                   ) : (
-                    employees
+                    filteredEmployees
                       .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                       .map((employee) => (
                       <tr key={employee.id}>
-                        <td><strong>{employee.id}</strong></td>
-                        <td>{employee.emp_code || `EMP${employee.id.toString().padStart(3, '0')}`}</td>
-                        <td>{`${employee.first_name} ${employee.last_name}`}</td>
-                        <td>{employee.email}</td>
-                        <td>{employee.department_name || 'N/A'}</td>
-                        <td>
+                        <td style={{ verticalAlign: 'middle' }}><strong>{employee.id}</strong></td>
+                        <td style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>{employee.emp_code || `EMP${employee.id.toString().padStart(3, '0')}`}</td>
+                        <td style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>{`${employee.first_name} ${employee.last_name}`}</td>
+                        <td style={{ verticalAlign: 'middle' }}>{employee.email}</td>
+                        <td style={{ verticalAlign: 'middle' }}>{employee.department_name || 'N/A'}</td>
+                        <td style={{ verticalAlign: 'middle', whiteSpace: 'pre-wrap', maxWidth: '200px' }}>
+                          {employee.address ? (
+                            <small style={{ fontSize: '0.85em', lineHeight: '1.4' }}>
+                              {employee.address}
+                            </small>
+                          ) : 'N/A'}
+                        </td>
+                        <td style={{ verticalAlign: 'middle' }}>{employee.bank_name || 'N/A'}</td>
+                        <td style={{ verticalAlign: 'middle' }}>{employee.bank_account_number || 'N/A'}</td>
+                        <td style={{ verticalAlign: 'middle' }}>{employee.ifsc_code || 'N/A'}</td>
+                        <td style={{ verticalAlign: 'middle' }}>
                           <span className={`badge ${employee.is_active ? '' : 'bg-secondary'}`} style={{ backgroundColor: employee.is_active ? '#2ecc71' : undefined }}>
                             {employee.is_active ? 'Active' : 'Inactive'}
                           </span>
                         </td>
-                        <td>
-                          <Link 
-                            to={`/employees/edit/${employee.id}`} 
-                            className="btn btn-sm shadow-sm me-2"
-                            style={{ background: '#9b59b6', color: 'white', border: 'none', borderRadius: '6px' }}
-                          >
-                            <i className="bi bi-pencil"></i> Edit
-                          </Link>
-                          <button 
-                            className="btn btn-sm btn-outline-danger shadow-sm"
-                            onClick={() => handleDelete(employee.id)}
-                            style={{ borderRadius: '6px' }}
-                          >
-                            <i className="bi bi-trash"></i> Delete
-                          </button>
+                        <td style={{ verticalAlign: 'middle' }}>
+                          <div className="d-flex gap-1">
+                            <Link 
+                              to={`/employees/edit/${employee.id}`} 
+                              className="btn btn-sm shadow-sm"
+                              style={{ background: '#9b59b6', color: 'white', border: 'none', borderRadius: '6px' }}
+                            >
+                              <i className="bi bi-pencil"></i> Edit
+                            </Link>
+                            <button 
+                              className="btn btn-sm btn-outline-danger shadow-sm"
+                              onClick={() => handleDelete(employee.id)}
+                              style={{ borderRadius: '6px' }}
+                            >
+                              <i className="bi bi-trash"></i> Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -242,7 +297,7 @@ export function EmployeeList() {
                 </li>
               </ul>
               <div className="mt-2 text-muted small">
-                Page {currentPage} of {totalPages} (Total: {employees.length} employees)
+                Page {currentPage} of {totalPages} (Total: {filteredEmployees.length} employees)
               </div>
             </nav>
           </div>

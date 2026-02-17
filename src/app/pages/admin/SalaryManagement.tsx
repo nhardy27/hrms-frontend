@@ -19,6 +19,9 @@ interface Employee {
   first_name: string;
   last_name: string;
   emp_code?: string;
+  bank_name?: string;
+  bank_account_number?: string;
+  ifsc_code?: string;
 }
 
 // TypeScript interface for Year data
@@ -53,6 +56,8 @@ interface SalaryRecord {
   absent_days: number;
   half_days: number;
   deduction: string;
+  pf_percentage: string;
+  pf_amount: string;
   net_salary: string;
   payment_status: string;
 }
@@ -71,6 +76,8 @@ interface SalaryForm {
   absent_days: number;
   half_days: number;
   deduction: string;
+  pf_percentage: string;
+  pf_amount: string;
   net_salary: string;
   payment_status: string;
 }
@@ -97,6 +104,8 @@ export function SalaryManagement() {
   
   // State to store list of employees
   const [employees, setEmployees] = useState<Employee[]>([]);
+  // State to store selected employee's bank info
+  const [selectedEmployeeBankInfo, setSelectedEmployeeBankInfo] = useState<{bank_name?: string; bank_account_number?: string; ifsc_code?: string} | null>(null);
   // State to store list of years
   const [years, setYears] = useState<Year[]>([]);
   // State to store all salary records
@@ -120,6 +129,8 @@ export function SalaryManagement() {
     absent_days: 0,
     half_days: 0,
     deduction: '0',
+    pf_percentage: '12.00',
+    pf_amount: '0',
     net_salary: '0',
     payment_status: 'unpaid'
   });
@@ -156,7 +167,7 @@ export function SalaryManagement() {
   // Effect runs when salary components change - recalculates net salary
   useEffect(() => {
     calculateNetSalary();
-  }, [formData.basic_salary, formData.hra, formData.allowance, formData.deduction, formData.present_days, formData.half_days, formData.total_working_days]);
+  }, [formData.basic_salary, formData.hra, formData.allowance, formData.deduction, formData.pf_percentage, formData.present_days, formData.half_days, formData.total_working_days]);
 
   // Function to fetch all salary records from API
   const fetchSalaries = async () => {
@@ -203,6 +214,7 @@ export function SalaryManagement() {
         const data = await response.json();
         // Filter only active employees, exclude admin user
         const emps = data.results.filter((emp: any) => emp.is_active && emp.username !== 'admin');
+        console.log('Fetched employees with bank info:', emps);
         setEmployees(emps);
       }
     } catch (error) {
@@ -228,35 +240,41 @@ export function SalaryManagement() {
   // Function to fetch and calculate attendance for selected month
   const fetchAttendanceForMonth = async () => {
     try {
-      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.attendance}`);
+      const selectedEmployee = employees.find(e => e.id === parseInt(formData.user));
+      const selectedYear = years.find(y => y.id === formData.year)?.year;
+      const selectedMonth = MONTHS.find(m => m.value === formData.month)?.label.toLowerCase();
+
+      if (!selectedEmployee?.emp_code || !selectedYear || !selectedMonth) {
+        console.log('Missing required data for attendance search');
+        return;
+      }
+
+      const searchUrl = `${config.api.host}${config.api.attendance}?emp_code=${selectedEmployee.emp_code}&year=${selectedYear}&month=${selectedMonth}`;
+      console.log('Fetching attendance from:', searchUrl);
+
+      const response = await makeAuthenticatedRequest(searchUrl);
+      console.log('Attendance response status:', response.status);
+
       if (response.ok) {
         const data = await response.json();
-        const selectedYear = years.find(y => y.id === formData.year)?.year;
-        
-        // Filter attendance records for selected employee, year, and month
-        const monthRecords = data.results.filter((att: Attendance) => {
-          const attDate = new Date(att.date);
-          return att.user === parseInt(formData.user) && 
-                 attDate.getFullYear() === selectedYear &&
-                 attDate.getMonth() + 1 === formData.month;
-        });
-        
+        console.log('Attendance data received:', data);
+        const monthRecords = data.results || data || [];
+        console.log('Month records:', monthRecords);
+
         let presentDays = 0;
         let halfDays = 0;
-        
-        // Calculate present and half days based on hours worked
+
         monthRecords.forEach((att: Attendance) => {
           if (att.total_hours) {
             const [hours] = att.total_hours.split(':').map(Number);
-            if (hours >= 7) presentDays++; // Full day if 7+ hours
-            else if (hours >= 4) halfDays++; // Half day if 4-6 hours
+            if (hours >= 7) presentDays++;
+            else if (hours >= 4) halfDays++;
           }
         });
-        
-        // Calculate absent days
+
         const absentDays = formData.total_working_days - presentDays - halfDays;
-        
-        // Update form with calculated attendance
+        console.log('Calculated - Present:', presentDays, 'Half:', halfDays, 'Absent:', absentDays);
+
         setFormData(prev => ({
           ...prev,
           present_days: presentDays,
@@ -264,11 +282,15 @@ export function SalaryManagement() {
           absent_days: absentDays,
           attendance: monthRecords[0]?.id || ''
         }));
+      } else {
+        const errorData = await response.text();
+        console.error('Attendance fetch error:', errorData);
       }
     } catch (error) {
       console.error("Error fetching attendance:", error);
     }
   };
+
 
   // Function to calculate net salary based on components and attendance
   const calculateNetSalary = () => {
@@ -277,6 +299,7 @@ export function SalaryManagement() {
     const hra = parseFloat(formData.hra) || 0;
     const allowance = parseFloat(formData.allowance) || 0;
     const deduction = parseFloat(formData.deduction) || 0;
+    const pfPercentage = parseFloat(formData.pf_percentage) || 0;
     
     // Calculate total salary and per day salary
     const totalSalary = basic + hra + allowance;
@@ -285,11 +308,18 @@ export function SalaryManagement() {
     // Calculate earned salary (full days + half days at 50%)
     const earnedSalary = (formData.present_days * perDaySalary) + (formData.half_days * perDaySalary * 0.5);
     
-    // Calculate final net salary after deductions
-    const netSalary = earnedSalary - deduction;
+    // Calculate PF amount
+    const pfAmount = (basic * pfPercentage) / 100;
     
-    // Update form with calculated net salary
-    setFormData(prev => ({ ...prev, net_salary: netSalary.toFixed(2) }));
+    // Calculate final net salary after deductions and PF
+    const netSalary = earnedSalary - deduction - pfAmount;
+    
+    // Update form with calculated values
+    setFormData(prev => ({ 
+      ...prev, 
+      pf_amount: pfAmount.toFixed(2),
+      net_salary: netSalary.toFixed(2) 
+    }));
   };
 
   // Function to handle viewing salary slip
@@ -315,6 +345,8 @@ export function SalaryManagement() {
       absent_days: salary.absent_days,
       half_days: salary.half_days,
       deduction: salary.deduction,
+      pf_percentage: salary.pf_percentage,
+      pf_amount: salary.pf_amount,
       net_salary: salary.net_salary,
       payment_status: salary.payment_status
     });
@@ -388,6 +420,8 @@ export function SalaryManagement() {
         absent_days: formData.absent_days,
         half_days: formData.half_days,
         deduction: parseFloat(formData.deduction).toFixed(2),
+        pf_percentage: parseFloat(formData.pf_percentage).toFixed(2),
+        pf_amount: parseFloat(formData.pf_amount).toFixed(2),
         net_salary: parseFloat(formData.net_salary).toFixed(2),
         payment_status: formData.payment_status
       };
@@ -456,6 +490,8 @@ export function SalaryManagement() {
           absent_days: 0,
           half_days: 0,
           deduction: '0',
+          pf_percentage: '12.00',
+          pf_amount: '0',
           net_salary: '0',
           payment_status: 'unpaid'
         });
@@ -511,6 +547,8 @@ export function SalaryManagement() {
                     absent_days: 0,
                     half_days: 0,
                     deduction: '0',
+                    pf_percentage: '12.00',
+                    pf_amount: '0',
                     net_salary: '0',
                     payment_status: 'unpaid'
                   });
@@ -532,7 +570,25 @@ export function SalaryManagement() {
                       <select
                         className="form-select shadow-sm"
                         value={formData.user}
-                        onChange={(e) => setFormData({ ...formData, user: e.target.value })}
+                        onChange={(e) => {
+                          const selectedEmp = employees.find(emp => emp.id === parseInt(e.target.value));
+                          console.log('Selected employee:', selectedEmp);
+                          if (selectedEmp) {
+                            setSelectedEmployeeBankInfo({
+                              bank_name: selectedEmp.bank_name,
+                              bank_account_number: selectedEmp.bank_account_number,
+                              ifsc_code: selectedEmp.ifsc_code
+                            });
+                            console.log('Bank info set:', {
+                              bank_name: selectedEmp.bank_name,
+                              bank_account_number: selectedEmp.bank_account_number,
+                              ifsc_code: selectedEmp.ifsc_code
+                            });
+                          } else {
+                            setSelectedEmployeeBankInfo(null);
+                          }
+                          setFormData({ ...formData, user: e.target.value });
+                        }}
                         required
                         style={{borderRadius: '8px', padding: '10px', border: '1px solid #dee2e6', background: '#ffffff'}}
                       >
@@ -582,6 +638,29 @@ export function SalaryManagement() {
                   </div>
                 </div>
               </div>
+
+              {/* Bank Details */}
+              {selectedEmployeeBankInfo && (
+                <div className="card border-0 shadow-sm mb-3">
+                  <div className="card-body">
+                    <h6 className="mb-3 fw-bold" style={{ color: '#2c3e50' }}><i className="bi bi-bank me-2"></i>Bank Details</h6>
+                    <div className="row">
+                      <div className="col-md-4 mb-3">
+                        <label className="form-label fw-semibold text-secondary">Bank Name</label>
+                        <input type="text" className="form-control" value={selectedEmployeeBankInfo.bank_name || 'Not Available'} readOnly style={{borderRadius: '8px', padding: '10px', background: '#f8f9fa'}} />
+                      </div>
+                      <div className="col-md-4 mb-3">
+                        <label className="form-label fw-semibold text-secondary">Account Number</label>
+                        <input type="text" className="form-control" value={selectedEmployeeBankInfo.bank_account_number || 'Not Available'} readOnly style={{borderRadius: '8px', padding: '10px', background: '#f8f9fa'}} />
+                      </div>
+                      <div className="col-md-4 mb-3">
+                        <label className="form-label fw-semibold text-secondary">IFSC Code</label>
+                        <input type="text" className="form-control" value={selectedEmployeeBankInfo.ifsc_code || 'Not Available'} readOnly style={{borderRadius: '8px', padding: '10px', background: '#f8f9fa'}} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Salary Components */}
               <div className="card border-0 shadow-sm mb-3">
@@ -702,8 +781,37 @@ export function SalaryManagement() {
                 <div className="card-body">
                   <h6 className="mb-3 fw-bold" style={{ color: '#2c3e50' }}><i className="bi bi-calculator me-2"></i>Final Calculation</h6>
                   <div className="row">
+                    {/* PF Percentage input field */}
+                    <div className="col-md-3 mb-3">
+                      <label className="form-label fw-semibold text-secondary">PF Percentage (%)</label>
+                      <input
+                        type="number"
+                        className="form-control shadow-sm"
+                        placeholder="12.00"
+                        value={formData.pf_percentage}
+                        onChange={(e) => setFormData({ ...formData, pf_percentage: e.target.value })}
+                        step="0.01"
+                        style={{borderRadius: '8px', padding: '10px', border: '1px solid #dee2e6', background: '#ffffff'}}
+                      />
+                    </div>
+
+                    {/* PF Amount - Auto-calculated, read-only */}
+                    <div className="col-md-3 mb-3">
+                      <label className="form-label fw-semibold text-secondary">PF Amount</label>
+                      <div className="input-group shadow-sm">
+                        <span className="input-group-text text-white" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
+                        <input
+                          type="number"
+                          className="form-control"
+                          value={formData.pf_amount}
+                          readOnly
+                          style={{borderRadius: '0 8px 8px 0', padding: '10px', background: '#f8f9fa'}}
+                        />
+                      </div>
+                    </div>
+
                     {/* Deduction input field */}
-                    <div className="col-md-4 mb-3">
+                    <div className="col-md-3 mb-3">
                       <label className="form-label fw-semibold text-secondary">Deduction</label>
                       <div className="input-group shadow-sm">
                         <span className="input-group-text text-white" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
@@ -719,7 +827,7 @@ export function SalaryManagement() {
                     </div>
 
                     {/* Net Salary - Auto-calculated, read-only */}
-                    <div className="col-md-4 mb-3">
+                    <div className="col-md-3 mb-3">
                       <label className="form-label fw-semibold text-secondary">Net Salary</label>
                       <div className="input-group shadow-sm">
                         <span className="input-group-text text-white" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
@@ -734,7 +842,7 @@ export function SalaryManagement() {
                     </div>
 
                     {/* Payment Status dropdown */}
-                    <div className="col-md-4 mb-3">
+                    <div className="col-md-12 mb-3">
                       <label className="form-label fw-semibold text-secondary">Payment Status</label>
                       <select
                         className="form-select shadow-sm"

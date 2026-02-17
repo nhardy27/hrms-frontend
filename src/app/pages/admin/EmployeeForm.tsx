@@ -23,6 +23,10 @@ interface Employee {
   date_of_joining: string;
   is_active: boolean;
   is_staff: boolean;
+  address?: string;
+  bank_name?: string;
+  bank_account_number?: string;
+  ifsc_code?: string;
 }
 
 export function EmployeeForm() {
@@ -48,6 +52,10 @@ export function EmployeeForm() {
     is_staff: false,
     is_active: true,
     groups: [1],
+    address: "",
+    bank_name: "",
+    bank_account_number: "",
+    ifsc_code: "",
   });
 
   const refreshToken = async () => {
@@ -224,6 +232,10 @@ export function EmployeeForm() {
           is_staff: employee.is_staff || false,
           is_active: employee.is_active || true,
           groups: [1],
+          address: employee.address || "",
+          bank_name: employee.bank_name || "",
+          bank_account_number: employee.bank_account_number || "",
+          ifsc_code: employee.ifsc_code || "",
         });
       }
     } catch (error) {
@@ -565,6 +577,66 @@ export function EmployeeForm() {
                   <option value="false">No</option>
                   <option value="true">Yes</option>
                 </select>
+              </div>
+
+              <div className="col-md-12">
+                <label htmlFor="address" className="form-label">
+                  Address
+                </label>
+                <textarea
+                  className="form-control"
+                  id="address"
+                  name="address"
+                  value={formData.address}
+                  onChange={handleChange}
+                  rows={3}
+                  placeholder="Enter full address"
+                />
+              </div>
+
+              <div className="col-md-4">
+                <label htmlFor="bank_name" className="form-label">
+                  Bank Name
+                </label>
+                <input
+                  type="text"
+                  className="form-control"
+                  id="bank_name"
+                  name="bank_name"
+                  value={formData.bank_name}
+                  onChange={handleChange}
+                  placeholder="Enter bank name"
+                />
+              </div>
+
+              <div className="col-md-4">
+                <label htmlFor="bank_account_number" className="form-label">
+                  Bank Account Number
+                </label>
+                <input
+                  type="text"
+                  className="form-control"
+                  id="bank_account_number"
+                  name="bank_account_number"
+                  value={formData.bank_account_number}
+                  onChange={handleChange}
+                  placeholder="Enter account number"
+                />
+              </div>
+
+              <div className="col-md-4">
+                <label htmlFor="ifsc_code" className="form-label">
+                  IFSC Code
+                </label>
+                <input
+                  type="text"
+                  className="form-control"
+                  id="ifsc_code"
+                  name="ifsc_code"
+                  value={formData.ifsc_code}
+                  onChange={handleChange}
+                  placeholder="Enter IFSC code"
+                />
               </div>
             </div>
 

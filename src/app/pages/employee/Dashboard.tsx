@@ -320,7 +320,9 @@ export function EmployeeDashboard() {
           <div className="container-fluid">
             <span className="navbar-brand fw-bold" style={{ color: '#2c3e50' }}>Employee Portal - {employee?.first_name?.toUpperCase()}</span>
             <div className="navbar-nav ms-auto">
-              <span className="nav-link" style={{ color: '#2c3e50' }}><i className="bi bi-person-circle me-2"></i>{employee?.username?.toUpperCase()}</span>
+              <button className="nav-link btn btn-link" onClick={handleLogout} style={{ color: '#2c3e50', textDecoration: 'none', cursor: 'pointer' }}>
+                <i className="bi bi-person-circle me-2"></i>{employee?.username?.toUpperCase()}
+              </button>
             </div>
           </div>
         </nav>

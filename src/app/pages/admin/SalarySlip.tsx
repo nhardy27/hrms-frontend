@@ -31,6 +31,16 @@ export function SalarySlip() {
           const userResponse = await makeAuthenticatedRequest(`${config.api.host}${config.api.user}${data.user.id}/`);
           if (userResponse.ok) {
             const userData = await userResponse.json();
+            
+            // Fetch department name if department ID exists
+            if (userData.department) {
+              const deptResponse = await makeAuthenticatedRequest(`${config.api.host}${config.api.department}${userData.department}/`);
+              if (deptResponse.ok) {
+                const deptData = await deptResponse.json();
+                userData.departmentName = deptData.name;
+              }
+            }
+            
             setSalary((prev: any) => ({ ...prev, userDetails: userData }));
           }
         }
@@ -77,6 +87,7 @@ export function SalarySlip() {
   }
 
   const grossSalary = parseFloat(salary.basic_salary) + parseFloat(salary.hra) + parseFloat(salary.allowance);
+  const totalDeduction = parseFloat(salary.pf_amount || 0) + parseFloat(salary.deduction || 0);
 
   return (
     <AdminLayout title="Salary Slip">
@@ -106,18 +117,32 @@ export function SalarySlip() {
               <div className="col-6">
                 <p><strong>Employee Name:</strong> {salary.userDetails?.first_name || ''} {salary.userDetails?.last_name || ''}</p>
                 <p><strong>Employee Code:</strong> {salary.userDetails?.emp_code || salary.user?.username || 'N/A'}</p>
+                <p><strong>Mobile Number:</strong> {salary.userDetails?.contact_no || 'N/A'}</p>
               </div>
               <div className="col-6">
                 <p><strong>Email:</strong> {salary.user?.email || ''}</p>
-                <p><strong>Payment Status:</strong> <span className={`badge ${salary.payment_status === 'paid' ? 'bg-success' : 'bg-warning'}`}>{salary.payment_status.toUpperCase()}</span></p>
+                <p><strong>Designation:</strong> {salary.userDetails?.designation || 'N/A'}</p>
+                <p><strong>Department:</strong> {salary.userDetails?.departmentName || 'N/A'}</p>
               </div>
+            </div>
+
+            <div className="text-center mb-3">
+              <strong>Payment Status: </strong>
+              <span className={`badge ${salary.payment_status === 'paid' ? 'bg-success' : 'bg-warning'}`} style={{ padding: '6px 12px', fontSize: '12px' }}>
+                {salary.payment_status.toUpperCase()}
+              </span>
+              {salary.payment_date && (
+                <span style={{ marginLeft: '20px' }}>
+                  <strong>Payment Date: </strong>{new Date(salary.payment_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </span>
+              )}
             </div>
 
             <hr />
 
             <div className="row mb-4">
-              <div className="col-12">
-                <h5 style={{ color: '#2c3e50', marginBottom: '20px' }}>Earnings</h5>
+              <div className="col-6">
+                <h5 style={{ color: '#2c3e50', marginBottom: '20px' }}>EARNINGS</h5>
                 <table className="table table-bordered">
                   <tbody>
                     <tr>
@@ -132,35 +157,32 @@ export function SalarySlip() {
                       <td><strong>Allowance</strong></td>
                       <td className="text-end">₹ {parseFloat(salary.allowance).toFixed(2)}</td>
                     </tr>
-                    <tr style={{ backgroundColor: '#f8f9fa' }}>
+                    <tr style={{ backgroundColor: '#f8f9fa', fontWeight: 'bold' }}>
                       <td><strong>Gross Salary</strong></td>
                       <td className="text-end"><strong>₹ {grossSalary.toFixed(2)}</strong></td>
                     </tr>
                   </tbody>
                 </table>
               </div>
-            </div>
-
-            <div className="row mb-4">
-              <div className="col-12">
-                <h5 style={{ color: '#2c3e50', marginBottom: '20px' }}>Attendance Details</h5>
+              <div className="col-6">
+                <h5 style={{ color: '#2c3e50', marginBottom: '20px' }}>DEDUCTIONS</h5>
                 <table className="table table-bordered">
                   <tbody>
                     <tr>
-                      <td><strong>Total Working Days</strong></td>
-                      <td className="text-end">{salary.total_working_days}</td>
+                      <td><strong>PF ({salary.pf_percentage || 0}%)</strong></td>
+                      <td className="text-end">₹ {parseFloat(salary.pf_amount || 0).toFixed(2)}</td>
                     </tr>
                     <tr>
-                      <td><strong>Present Days</strong></td>
-                      <td className="text-end">{salary.present_days}</td>
+                      <td><strong>Deduction</strong></td>
+                      <td className="text-end">₹ {parseFloat(salary.deduction || 0).toFixed(2)}</td>
                     </tr>
                     <tr>
-                      <td><strong>Half Days</strong></td>
-                      <td className="text-end">{salary.half_days}</td>
+                      <td></td>
+                      <td></td>
                     </tr>
-                    <tr>
-                      <td><strong>Absent Days</strong></td>
-                      <td className="text-end">{salary.absent_days}</td>
+                    <tr style={{ backgroundColor: '#f8f9fa', fontWeight: 'bold' }}>
+                      <td><strong>Total Deduction</strong></td>
+                      <td className="text-end"><strong>₹ {totalDeduction.toFixed(2)}</strong></td>
                     </tr>
                   </tbody>
                 </table>
@@ -169,12 +191,20 @@ export function SalarySlip() {
 
             <div className="row mb-4">
               <div className="col-12">
-                <h5 style={{ color: '#2c3e50', marginBottom: '20px' }}>Deductions</h5>
+                <h5 style={{ color: '#2c3e50', marginBottom: '20px' }}>ATTENDANCE</h5>
                 <table className="table table-bordered">
                   <tbody>
                     <tr>
-                      <td><strong>Total Deduction</strong></td>
-                      <td className="text-end">₹ {parseFloat(salary.deduction).toFixed(2)}</td>
+                      <td style={{ width: '25%' }}><strong>Working Days</strong></td>
+                      <td className="text-end" style={{ width: '25%' }}>{salary.total_working_days}</td>
+                      <td style={{ width: '25%' }}><strong>Present Days</strong></td>
+                      <td className="text-end" style={{ width: '25%' }}>{salary.present_days}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Half Days</strong></td>
+                      <td className="text-end">{salary.half_days}</td>
+                      <td><strong>Absent Days</strong></td>
+                      <td className="text-end">{salary.absent_days}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -197,9 +227,9 @@ export function SalarySlip() {
             </div>
 
             <div className="text-center mt-5" style={{ color: '#7f8c8d', fontSize: '12px' }}>
-              <p>This is a computer-generated salary slip and does not require a signature.</p>
-              <p>For any queries, please contact HR department.</p>
-              <p>neel.humbingo@gmail.com</p>
+              <p>This is a computer-generated salary slip.</p>
+              <p>For queries, contact HR department.</p>
+              <p>hr.humbingo@gmail.com</p>
             </div>
           </div>
         </div>
