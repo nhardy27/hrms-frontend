@@ -147,7 +147,7 @@ export function AdminDashboard() {
               link: "/mark-attendance"
             },
           ].map((card, index) => (
-            <div key={index} className="col-md-4">
+            <div key={index} className="col-12 col-md-6 col-lg-4">
               {/* Clickable card with hover effect */}
               <div
                 className="card border-0 shadow-lg"
@@ -179,7 +179,7 @@ export function AdminDashboard() {
         {/* Second row of statistics cards */}
         <div className="row g-4 mt-2">
           {/* Pending Leaves Card */}
-          <div className="col-md-4">
+          <div className="col-12 col-md-6 col-lg-4">
             <div
               className="card border-0 shadow-lg"
               style={{ 
@@ -203,7 +203,7 @@ export function AdminDashboard() {
             </div>
           </div>
           {/* Paid Salaries Card */}
-          <div className="col-md-4">
+          <div className="col-12 col-md-6 col-lg-4">
             <div
               className="card border-0 shadow-lg"
               style={{ 
@@ -227,7 +227,7 @@ export function AdminDashboard() {
             </div>
           </div>
           {/* Unpaid Salaries Card */}
-          <div className="col-md-4">
+          <div className="col-12 col-md-6 col-lg-4">
             <div
               className="card border-0 shadow-lg"
               style={{ 
@@ -255,13 +255,13 @@ export function AdminDashboard() {
         {/* ================= Attendance Overview ================= */}
         {/* Visual representation of today's attendance with circular progress */}
         <div className="row g-4 mt-2">
-          <div className="col-md-12">
+          <div className="col-12">
             <div className="card border-0 shadow-lg" style={{ borderRadius: 20 }}>
               <div className="card-body p-4">
                 <h5 className="fw-bold mb-4" style={{ color: '#2c3e50' }}>
                   <i className="bi bi-graph-up me-2"></i>Today's Attendance Overview
                 </h5>
-                <div className="d-flex align-items-center justify-content-around">
+                <div className="d-flex flex-column flex-md-row align-items-center justify-content-around gap-4">
                   {/* Circular progress chart showing attendance percentage */}
                   <div className="text-center">
                     <div className="position-relative d-inline-block">
@@ -281,7 +281,7 @@ export function AdminDashboard() {
                     </div>
                   </div>
                   {/* Attendance breakdown: Present, Absent, Total */}
-                  <div className="d-flex gap-5">
+                  <div className="d-flex flex-wrap gap-3 gap-md-5 justify-content-center">
                     {/* Present employees */}
                     <div className="text-center">
                       <div className="mb-2" style={{ width: 80, height: 80, borderRadius: '50%', background: '#2ecc71', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -324,7 +324,7 @@ export function AdminDashboard() {
                 </h5>
                 <div className="row g-3">
                   {/* Total working days in current month */}
-                  <div className="col-md-6">
+                  <div className="col-12 col-md-6">
                     <div className="p-3 rounded" style={{ background: '#f8f9fa' }}>
                       <div className="d-flex align-items-center justify-content-between">
                         <div>
@@ -337,7 +337,7 @@ export function AdminDashboard() {
                     </div>
                   </div>
                   {/* Average attendance percentage */}
-                  <div className="col-md-6">
+                  <div className="col-12 col-md-6">
                     <div className="p-3 rounded" style={{ background: '#f8f9fa' }}>
                       <div className="d-flex align-items-center justify-content-between">
                         <div>

@@ -102,8 +102,8 @@ export function LeaveManagement() {
             ) : leaveRequests.length === 0 ? (
               <p className="text-center">No leave requests found.</p>
             ) : (
-              <div className="table-responsive">
-                <table className="table table-hover">
+              <div className="table-responsive" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                <table className="table table-hover" style={{ minWidth: '1200px' }}>
                   <thead>
                     <tr>
                       <th>Employee Name</th>

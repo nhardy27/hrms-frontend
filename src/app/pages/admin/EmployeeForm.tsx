@@ -37,6 +37,7 @@ export function EmployeeForm() {
   const [loading, setLoading] = useState(false);
   const [usernameError, setUsernameError] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  const [checkingUsername, setCheckingUsername] = useState(false);
 
   const [formData, setFormData] = useState({
     emp_code: "",
@@ -158,32 +159,21 @@ export function EmployeeForm() {
 
   const generateEmployeeCode = async () => {
     try {
-      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.user}`);
+      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.user}?ordering=-id&limit=1`);
       if (response.ok) {
         const data = await response.json();
         const employees = data.results || [];
         
-        // Find highest employee code number
         let maxEmpNum = 0;
-        employees.forEach((emp: any) => {
-          if (emp.emp_code) {
-            const match = emp.emp_code.match(/EMP(\d+)/);
-            if (match) {
-              const num = parseInt(match[1]);
-              if (num > maxEmpNum) {
-                maxEmpNum = num;
-              }
-            }
-          }
-        });
+        if (employees.length > 0 && employees[0].emp_code) {
+          const match = employees[0].emp_code.match(/EMP(\d+)/);
+          if (match) maxEmpNum = parseInt(match[1]);
+        }
         
-        // Generate next employee code
         const nextEmpCode = `EMP${String(maxEmpNum + 1).padStart(3, '0')}`;
         setFormData(prev => ({ ...prev, emp_code: nextEmpCode }));
       }
     } catch (error) {
-      console.error('Error generating employee code:', error);
-      // Fallback to timestamp-based code
       const fallbackCode = `EMP${String(Date.now()).slice(-3)}`;
       setFormData(prev => ({ ...prev, emp_code: fallbackCode }));
     }
@@ -200,13 +190,10 @@ export function EmployeeForm() {
 
   const fetchDepartments = async () => {
     try {
-      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.department}`);
+      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.department}?status=true`);
       if (response.ok) {
         const data = await response.json();
-        console.log('Departments data:', data); // Debug log
         setDepartments(data.results || data || []);
-      } else {
-        console.error('Failed to fetch departments:', response.status);
       }
     } catch (error) {
       console.error('Error fetching departments:', error);
@@ -246,21 +233,20 @@ export function EmployeeForm() {
   const checkUsernameExists = async (username: string) => {
     if (!username || (isEdit && username === formData.username)) return;
     
+    setCheckingUsername(true);
     try {
-      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.user}`);
+      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.user}?username=${username}`);
       if (response.ok) {
         const data = await response.json();
         const users = data.results || [];
         const existingUser = users.find((user: any) => user.username === username && (!isEdit || user.id !== id));
         
-        if (existingUser) {
-          setUsernameError('Username already exists');
-        } else {
-          setUsernameError('');
-        }
+        setUsernameError(existingUser ? 'Username already exists' : '');
       }
     } catch (error) {
       console.error('Error checking username:', error);
+    } finally {
+      setCheckingUsername(false);
     }
   };
 
@@ -270,7 +256,7 @@ export function EmployeeForm() {
     setUsernameError('');
     
     if (value.trim()) {
-      setTimeout(() => checkUsernameExists(value), 500);
+      setTimeout(() => checkUsernameExists(value), 800);
     }
   };
 
@@ -332,16 +318,10 @@ export function EmployeeForm() {
 
       if (response.ok) {
         toast.success(isEdit ? 'Employee updated successfully!' : 'Employee created successfully!');
-        // Force refresh of employee list by clearing any cached data
-        localStorage.removeItem('employeeListCache');
         navigate("/employees");
       } else {
         const errorData = await response.json();
-        console.error('Error saving employee:', errorData);
-        console.error('Response status:', response.status);
-        console.error('Submit data:', submitData);
         
-        // Show specific error messages if available
         if (errorData.username) {
           toast.error(`Username error: ${errorData.username[0]}`);
         } else if (errorData.email) {

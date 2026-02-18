@@ -1,12 +1,11 @@
 // React hooks for state management and side effects
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import toast, { Toaster } from 'react-hot-toast'; // Toast notifications
-import config from "../../../config/global.json"; // API configuration
+import toast, { Toaster } from 'react-hot-toast';
+import config from "../../../config/global.json";
 import { AdminLayout } from '../../components/AdminLayout';
 import { fetchAllPages, makeAuthenticatedRequest } from '../../../utils/apiUtils';
 
-// Employee data structure from API
 interface Employee {
   id: string;
   emp_code: string;
@@ -17,10 +16,9 @@ interface Employee {
   is_active: boolean;
 }
 
-// Attendance record structure from API
 interface AttendanceData {
   id: string;
-  user: number; // Employee ID
+  user: number;
   date: string;
   check_in?: string;
   check_out?: string;
@@ -28,30 +26,22 @@ interface AttendanceData {
   attendance_status: string;
 }
 
-// Manual time entry for updating attendance
 interface ManualTime {
   check_in: string;
   check_out: string;
 }
 
-
-
 export function MarkAttendance() {
   const navigate = useNavigate();
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [existingAttendance, setExistingAttendance] = useState<AttendanceData[]>([]);
+  const [manualTimes, setManualTimes] = useState<Record<string, ManualTime>>({});
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
+  const [loading, setLoading] = useState(false);
+  const [dataLoading, setDataLoading] = useState(true);
 
-  // State variables
-  const [employees, setEmployees] = useState<Employee[]>([]); // List of all active employees
-  const [existingAttendance, setExistingAttendance] = useState<AttendanceData[]>([]); // Attendance records for selected date
-  const [manualTimes, setManualTimes] = useState<Record<string, ManualTime>>({}); // Manual time overrides by employee ID
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0] // Default to today's date
-  );
-  const [loading, setLoading] = useState(false); // Loading state for save operation
-
-  // Initialize component on mount - check admin access and load data
   useEffect(() => {
     const initializeData = async () => {
-      // Check if user is admin/superuser
       const user = localStorage.getItem('user');
       if (!user) {
         navigate('/admin-dashboard');
@@ -59,111 +49,67 @@ export function MarkAttendance() {
       }
       
       const userData = JSON.parse(user);
-      // Only allow superusers or admin staff to access this page
       if (!(userData.is_superuser === true || (userData.is_staff === true && userData.username === 'admin'))) {
-        toast.error('Access denied. Only admin users can access this page.');
+        toast.error('Access denied');
         navigate('/employee-dashboard');
         return;
       }
       
-      console.log('Starting data initialization...');
-      
-      // Load employees and attendance data
-      console.log('Fetching employees and attendance...');
       await fetchEmployeesAndAttendance();
-      
-      console.log('Data initialization complete');
     };
     
     initializeData().catch(error => {
-      console.error('Error during initialization:', error);
+      console.error('Initialization error:', error);
+      toast.error('Failed to load data');
+      setDataLoading(false);
     });
   }, []);
 
-  // Reload attendance data when date changes
   useEffect(() => {
     if (employees.length > 0) {
       fetchEmployeesAndAttendance();
     }
   }, [selectedDate]);
 
-
-  // Find attendance record for a specific employee on selected date
   const getEmployeeAttendance = (employeeId: string): AttendanceData | null => {
-    const attendance = existingAttendance.find(att => 
-      att.user.toString() === employeeId.toString()
-    ) || null;
-    console.log(`Employee ${employeeId} attendance for ${selectedDate}:`, attendance);
-    console.log(`Looking for user ID: ${employeeId}, found: ${attendance ? attendance.user : 'none'}`);
-    return attendance;
+    return existingAttendance.find(att => att.user.toString() === employeeId.toString()) || null;
   };
 
-  // Fetch all employees and their attendance records from API
   const fetchEmployeesAndAttendance = async () => {
+    setDataLoading(true);
     try {
-      console.log('Fetching employees from User API...');
+      const allEmployees = await fetchAllPages(`${config.api.host}${config.api.user}`);
       
-      // Fetch all pages of employees from User API (handles pagination)
-      let allEmployees: any[] = [];
-      let nextUrl = `${config.api.host}${config.api.user}`;
+      const processedEmployees = allEmployees
+        .filter((emp: any) => emp.is_active && emp.username !== 'admin')
+        .map((emp: any) => ({
+          id: emp.id.toString(),
+          emp_code: `EMP${emp.id.toString().padStart(3, '0')}`,
+          first_name: emp.first_name || emp.username,
+          last_name: emp.last_name || '',
+          department: emp.department || '',
+          department_name: emp.department_name || 'N/A',
+          is_active: emp.is_active
+        }));
       
-      while (nextUrl) {
-        const employeeResponse = await makeAuthenticatedRequest(nextUrl);
-        
-        if (employeeResponse.ok) {
-          const employeeData = await employeeResponse.json();
-          console.log('User API page data:', employeeData);
-          
-          allEmployees = [...allEmployees, ...(employeeData.results || [])];
-          nextUrl = employeeData.next; // Get next page URL
-        } else {
-          console.error('Failed to fetch employees:', employeeResponse.status, employeeResponse.statusText);
-          break;
-        }
-      }
-      
-      console.log('All employees from all pages:', allEmployees.length);
-      
-      // Filter active employees (exclude admin) and format data
-      const processedEmployees = allEmployees.filter((emp: any) => 
-        emp.is_active && emp.username !== 'admin'
-      ).map((emp: any) => ({
-        id: emp.id.toString(),
-        emp_code: `EMP${emp.id.toString().padStart(3, '0')}`, // Generate employee code
-        first_name: emp.first_name || emp.username,
-        last_name: emp.last_name || '',
-        department: emp.department || '',
-        department_name: emp.department_name || 'N/A',
-        is_active: emp.is_active
-      }));
-      
-      console.log('Processed employees:', processedEmployees);
       setEmployees(processedEmployees);
       
-      // Fetch attendance data using fetchAllPages (handles pagination automatically)
-      console.log('Fetching attendance data...');
-      const allAttendanceRecords = await fetchAllPages(`${config.api.host}${config.api.attendance}`);
+      const attendanceUrl = `${config.api.host}${config.api.attendance}?date=${selectedDate}`;
+      const response = await makeAuthenticatedRequest(attendanceUrl);
       
-      console.log('All attendance records from all pages:', allAttendanceRecords.length);
-      
-      // Filter attendance for selected date only
-      const attendanceForDate = allAttendanceRecords.filter(
-        (att: AttendanceData) => att.date === selectedDate
-      );
-      
-      console.log('Attendance for date:', attendanceForDate);
-      setExistingAttendance(attendanceForDate);
-      
+      if (response.ok) {
+        const data = await response.json();
+        setExistingAttendance(data.results || []);
+      }
     } catch (error) {
-      console.error("Error fetching employees and attendance:", error);
+      console.error("Error fetching data:", error);
+      toast.error('Failed to load attendance data');
+    } finally {
+      setDataLoading(false);
     }
   };
 
-
-
-  // Handle manual time input changes for check-in/check-out
   const handleManualTimeChange = (employeeId: string, field: 'check_in' | 'check_out', value: string) => {
-    console.log(`Manual time change for employee ${employeeId}: ${field} = ${value}`);
     setManualTimes(prev => ({
       ...prev,
       [employeeId]: {
@@ -173,182 +119,109 @@ export function MarkAttendance() {
     }));
   };
 
-  // Save attendance records to database (create new or update existing)
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      console.log('Starting attendance save...');
-      
-      // Get attendance statuses from API (Present, Half Day, Absent)
       const statusResponse = await makeAuthenticatedRequest(`${config.api.host}${config.api.attendanceStatus}`);
-      if (!statusResponse.ok) {
-        throw new Error('Failed to get attendance status');
-      }
+      if (!statusResponse.ok) throw new Error('Failed to get attendance status');
+      
       const statusData = await statusResponse.json();
       const statuses = statusData.results || [];
       const presentStatus = statuses.find((s: any) => s.status?.toLowerCase() === 'present');
       const halfDayStatus = statuses.find((s: any) => s.status?.toLowerCase() === 'halfday');
       const absentStatus = statuses.find((s: any) => s.status?.toLowerCase() === 'absent');
       
-      if (!presentStatus) {
-        throw new Error('Present status not found');
-      }
+      if (!presentStatus) throw new Error('Present status not found');
 
-      // Process only employees with manual time changes
-      let successCount = 0;
-      let errorCount = 0;
-      
       const employeesToProcess = employees.filter(emp => {
         const manualTime = manualTimes[emp.id];
         return manualTime && (manualTime.check_in || manualTime.check_out);
       });
       
-      console.log(`Processing ${employeesToProcess.length} employees with manual time changes`);
-      
-      for (const emp of employeesToProcess) {
+      if (employeesToProcess.length === 0) {
+        toast.error('No changes to save');
+        return;
+      }
+
+      const requests = employeesToProcess.map(async (emp) => {
         const manualTime = manualTimes[emp.id];
-        console.log(`Processing employee ${emp.first_name} ${emp.last_name}:`, manualTime);
-        
         const existingAttendance = getEmployeeAttendance(emp.id);
         
-        try {
-          if (existingAttendance) {
-            // UPDATE existing attendance record
-            const updateData: any = {};
-            if (manualTime.check_in) updateData.check_in = manualTime.check_in;
-            if (manualTime.check_out) updateData.check_out = manualTime.check_out;
-            
-            // Calculate total_hours if both times are present
-            if (manualTime.check_in && manualTime.check_out) {
-              const checkIn = new Date(`1970-01-01T${manualTime.check_in}`);
-              const checkOut = new Date(`1970-01-01T${manualTime.check_out}`);
-              const totalMs = checkOut.getTime() - checkIn.getTime();
-              const hours = Math.floor(totalMs / (1000 * 60 * 60));
-              const minutes = Math.floor((totalMs % (1000 * 60 * 60)) / (1000 * 60));
-              const seconds = Math.floor((totalMs % (1000 * 60)) / 1000);
-              updateData.total_hours = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-            }
-            
-            // Ensure we have at least one field to update
-            if (Object.keys(updateData).length === 0) {
-              console.log(`No data to update for ${emp.first_name} ${emp.last_name}`);
-              continue;
-            }
-            
-            console.log('Update data:', updateData);
-            
-            const response = await makeAuthenticatedRequest(
-              `${config.api.host}${config.api.attendance}${existingAttendance.id}/`,
-              {
-                method: 'PATCH',
-                body: JSON.stringify(updateData)
-              }
-            );
-            
-            if (response.ok) {
-              console.log(`Successfully updated attendance for ${emp.first_name} ${emp.last_name}`);
-              successCount++;
-            } else {
-              const errorText = await response.text();
-              console.error(`Failed to update attendance for ${emp.first_name} ${emp.last_name}:`);
-              console.error('Status:', response.status);
-              console.error('Error:', errorText);
-              console.error('Update data sent:', updateData);
-              errorCount++;
-            }
-          } else {
-            // CREATE new attendance record
-            if (!manualTime.check_in && !manualTime.check_out) {
-              console.log(`No check-in or check-out time for ${emp.first_name} ${emp.last_name}`);
-              continue;
-            }
-            
-            // Calculate total_hours and auto-assign status
-            let totalHours = null;
-            let statusId = presentStatus.id; // default
-            
-            if (manualTime.check_in && manualTime.check_out) {
-              const checkIn = new Date(`1970-01-01T${manualTime.check_in}`);
-              const checkOut = new Date(`1970-01-01T${manualTime.check_out}`);
-              const totalMs = checkOut.getTime() - checkIn.getTime();
-              const hours = Math.floor(totalMs / (1000 * 60 * 60));
-              const minutes = Math.floor((totalMs % (1000 * 60 * 60)) / (1000 * 60));
-              const seconds = Math.floor((totalMs % (1000 * 60)) / 1000);
-              totalHours = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-              
-              // Auto-assign status: >=7hrs = Present, 4-7hrs = Half Day, <4hrs = Absent
-              const totalHoursDecimal = hours + minutes / 60 + seconds / 3600;
-              if (totalHoursDecimal >= 7) {
-                statusId = presentStatus.id;
-              } else if (totalHoursDecimal >= 4 && halfDayStatus) {
-                statusId = halfDayStatus.id;
-              } else if (absentStatus) {
-                statusId = absentStatus.id;
-              }
-            }
-            
-            const createData: Record<string, any> = {
-              user: parseInt(emp.id),
-              date: selectedDate,
-              attendance_status: statusId,
-              check_in: manualTime.check_in,
-              check_out: manualTime.check_out,
-              total_hours: totalHours
-            };
-            
-            // Remove null/undefined values
-            Object.keys(createData).forEach(key => {
-              if (createData[key] === null || createData[key] === undefined) {
-                delete createData[key];
-              }
-            });
-            
-            console.log('Create data:', createData);
-            
-            const response = await makeAuthenticatedRequest(
-              `${config.api.host}${config.api.attendance}`,
-              {
-                method: 'POST',
-                body: JSON.stringify(createData)
-              }
-            );
-            
-            if (response.ok) {
-              console.log(`Successfully created attendance for ${emp.first_name} ${emp.last_name}`);
-              successCount++;
-            } else {
-              const errorText = await response.text();
-              console.error(`Failed to create attendance for ${emp.first_name} ${emp.last_name}:`);
-              console.error('Status:', response.status);
-              console.error('Error:', errorText);
-              console.error('Create data sent:', createData);
-              errorCount++;
-            }
+        if (existingAttendance) {
+          const updateData: any = {};
+          if (manualTime.check_in) updateData.check_in = manualTime.check_in;
+          if (manualTime.check_out) updateData.check_out = manualTime.check_out;
+          
+          if (manualTime.check_in && manualTime.check_out) {
+            const checkIn = new Date(`1970-01-01T${manualTime.check_in}`);
+            const checkOut = new Date(`1970-01-01T${manualTime.check_out}`);
+            const totalMs = checkOut.getTime() - checkIn.getTime();
+            const hours = Math.floor(totalMs / (1000 * 60 * 60));
+            const minutes = Math.floor((totalMs % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((totalMs % (1000 * 60)) / 1000);
+            updateData.total_hours = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
           }
-        } catch (empError) {
-          console.error(`Error processing ${emp.first_name} ${emp.last_name}:`, empError);
-          errorCount++;
+          
+          if (Object.keys(updateData).length === 0) return { success: false };
+          
+          return makeAuthenticatedRequest(
+            `${config.api.host}${config.api.attendance}${existingAttendance.id}/`,
+            { method: 'PATCH', body: JSON.stringify(updateData) }
+          ).then(res => ({ success: res.ok }));
+        } else {
+          if (!manualTime.check_in && !manualTime.check_out) return { success: false };
+          
+          let totalHours = null;
+          let statusId = presentStatus.id;
+          
+          if (manualTime.check_in && manualTime.check_out) {
+            const checkIn = new Date(`1970-01-01T${manualTime.check_in}`);
+            const checkOut = new Date(`1970-01-01T${manualTime.check_out}`);
+            const totalMs = checkOut.getTime() - checkIn.getTime();
+            const hours = Math.floor(totalMs / (1000 * 60 * 60));
+            const minutes = Math.floor((totalMs % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((totalMs % (1000 * 60)) / 1000);
+            totalHours = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            const totalHoursDecimal = hours + minutes / 60 + seconds / 3600;
+            if (totalHoursDecimal >= 7) statusId = presentStatus.id;
+            else if (totalHoursDecimal >= 4 && halfDayStatus) statusId = halfDayStatus.id;
+            else if (absentStatus) statusId = absentStatus.id;
+          }
+          
+          const createData: Record<string, any> = {
+            user: parseInt(emp.id),
+            date: selectedDate,
+            attendance_status: statusId,
+            check_in: manualTime.check_in,
+            check_out: manualTime.check_out,
+            total_hours: totalHours
+          };
+          
+          Object.keys(createData).forEach(key => {
+            if (createData[key] === null || createData[key] === undefined) delete createData[key];
+          });
+          
+          return makeAuthenticatedRequest(
+            `${config.api.host}${config.api.attendance}`,
+            { method: 'POST', body: JSON.stringify(createData) }
+          ).then(res => ({ success: res.ok }));
         }
-      }
+      });
+
+      const results = await Promise.all(requests);
+      const successCount = results.filter(r => r.success).length;
+      const errorCount = results.length - successCount;
       
-      console.log(`Attendance save complete. Success: ${successCount}, Errors: ${errorCount}`);
-      
-      // Show success/error messages
       if (successCount > 0) {
-        toast.success(`Attendance saved to database for ${successCount} employees`);
-        setManualTimes({}); // Clear manual times after successful save
+        toast.success(`Attendance saved for ${successCount} employees`);
+        setManualTimes({});
       }
-      if (errorCount > 0) {
-        toast.error(`Failed to save ${errorCount} employees to database`);
-      }
-      if (employeesToProcess.length === 0) {
-        toast.error('No manual time changes to save');
-      }
+      if (errorCount > 0) toast.error(`Failed to save ${errorCount} employees`);
       
-      await fetchEmployeesAndAttendance(); // Refresh data from database
+      await fetchEmployeesAndAttendance();
     } catch (error) {
-      console.error("Error saving attendance:", error);
-      toast.error("Failed to save attendance to database: " + (error instanceof Error ? error.message : 'Unknown error'));
+      toast.error("Failed to save attendance");
     } finally {
       setLoading(false);
     }
@@ -359,7 +232,7 @@ export function MarkAttendance() {
       <Toaster position="bottom-center" />
       <div className="container-fluid p-4">
         <div className="card border-0 shadow-lg" style={{ borderRadius: '15px' }}>
-          <div className="card-header d-flex justify-content-between align-items-center" style={{ background: '#3498db', borderRadius: '15px 15px 0 0', border: 'none' }}>
+          <div className="card-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2" style={{ background: '#3498db', borderRadius: '15px 15px 0 0', border: 'none' }}>
             <h5 className="mb-0 text-white"><i className="bi bi-calendar-check-fill me-2"></i>Mark Employee Attendance</h5>
             <input
               type="date"
@@ -372,7 +245,7 @@ export function MarkAttendance() {
 
           <div className="card-body">
             <div className="row mb-3 g-3">
-              <div className="col-md-6">
+              <div className="col-12 col-md-6">
                 <div className="card border-0 shadow-sm" style={{ borderRadius: '12px', background: '#0e0e0e' }}>
                   <div className="card-body text-center text-white">
                     <h4 className="fw-bold">{employees.length}</h4>
@@ -380,50 +253,26 @@ export function MarkAttendance() {
                   </div>
                 </div>
               </div>
-              <div className="col-md-6">
+              <div className="col-12 col-md-6">
                 <div className="card border-0 shadow-sm" style={{ borderRadius: '12px', background: '#0e0e0e' }}>
                   <div className="card-body text-center text-white">
                     <h4 className="fw-bold">
-                      {(() => {
-                        // Calculate present count: employees with >=7 hours worked
-                        console.log('=== Present Count Calculation ===');
-                        console.log('existingAttendance:', existingAttendance);
-                        console.log('selectedDate:', selectedDate);
+                      {employees.filter(emp => {
+                        const empAttendance = getEmployeeAttendance(emp.id);
+                        const manualTime = manualTimes[emp.id];
+                        const checkInTime = manualTime?.check_in || empAttendance?.check_in;
+                        const checkOutTime = manualTime?.check_out || empAttendance?.check_out;
                         
-                        const presentCount = employees.filter(emp => {
-                          const empAttendance = getEmployeeAttendance(emp.id);
-                          const manualTime = manualTimes[emp.id];
-                          const checkInTime = manualTime?.check_in || empAttendance?.check_in;
-                          const checkOutTime = manualTime?.check_out || empAttendance?.check_out;
-                          
-                          console.log(`Employee ${emp.id} (${emp.first_name}):`, {
-                            empAttendance,
-                            checkInTime,
-                            checkOutTime,
-                            total_hours: empAttendance?.total_hours
-                          });
-                          
-                          // Use API total_hours if available
-                          if (empAttendance?.total_hours) {
-                            const [hours, minutes, seconds] = empAttendance.total_hours.split(':').map(Number);
-                            const calculatedHours = hours + minutes / 60 + seconds / 3600;
-                            console.log(`  -> Calculated hours from total_hours: ${calculatedHours}`);
-                            return calculatedHours >= 7;
-                          } else if (checkInTime && checkOutTime) {
-                            // Calculate from check-in/check-out times
-                            const checkIn = new Date(`1970-01-01T${checkInTime}`);
-                            const checkOut = new Date(`1970-01-01T${checkOutTime}`);
-                            const calculatedHours = (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60);
-                            console.log(`  -> Calculated hours from times: ${calculatedHours}`);
-                            return calculatedHours >= 7;
-                          }
-                          console.log(`  -> No attendance data`);
-                          return false;
-                        }).length;
-                        
-                        console.log('Total present count:', presentCount);
-                        return presentCount;
-                      })()}
+                        if (empAttendance?.total_hours) {
+                          const [hours, minutes, seconds] = empAttendance.total_hours.split(':').map(Number);
+                          return (hours + minutes / 60 + seconds / 3600) >= 7;
+                        } else if (checkInTime && checkOutTime) {
+                          const checkIn = new Date(`1970-01-01T${checkInTime}`);
+                          const checkOut = new Date(`1970-01-01T${checkOutTime}`);
+                          return ((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60)) >= 7;
+                        }
+                        return false;
+                      }).length}
                     </h4>
                     <p className="mb-0">Present Today</p>
                   </div>
@@ -431,11 +280,18 @@ export function MarkAttendance() {
               </div>
             </div>
 
-            {employees.length === 0 ? (
+            {dataLoading ? (
+              <div className="text-center py-5">
+                <div className="spinner-border text-primary" role="status">
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+                <p className="mt-2">Loading attendance data...</p>
+              </div>
+            ) : employees.length === 0 ? (
               <p className="text-center">No active employees found</p>
             ) : (
-              <div className="table-responsive">
-                <table className="table table-hover">
+              <div className="table-responsive" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                <table className="table table-hover" style={{ minWidth: '1200px' }}>
                   <thead>
                     <tr>
                       <th>ID</th>
@@ -453,23 +309,18 @@ export function MarkAttendance() {
                   <tbody>
                     {employees.map(emp => {
                       const empAttendance = getEmployeeAttendance(emp.id);
-                      
-                      // Calculate total hours worked
                       let totalHours = 'N/A';
                       let calculatedHours = 0;
                       
-                      // Get check-in/check-out times (manual override or existing)
                       const manualTime = manualTimes[emp.id];
                       const checkInTime = manualTime?.check_in || empAttendance?.check_in;
                       const checkOutTime = manualTime?.check_out || empAttendance?.check_out;
                       
-                      // Use API total_hours if available, otherwise calculate
                       if (empAttendance?.total_hours) {
                         const [hours, minutes, seconds] = empAttendance.total_hours.split(':').map(Number);
                         calculatedHours = hours + minutes / 60 + seconds / 3600;
                         totalHours = `${hours}h ${minutes}m ${seconds}s`;
                       } else if (checkInTime && checkOutTime) {
-                        // Calculate from check-in/check-out times
                         const checkIn = new Date(`1970-01-01T${checkInTime}`);
                         const checkOut = new Date(`1970-01-01T${checkOutTime}`);
                         const totalMs = checkOut.getTime() - checkIn.getTime();
@@ -481,7 +332,6 @@ export function MarkAttendance() {
                         totalHours = `${hours}h ${minutes}m ${seconds}s`;
                       }
                       
-                      // Determine auto status based on hours worked
                       let autoStatus = 'Absent';
                       let statusClass = 'bg-danger';
                       if (calculatedHours >= 7) {
@@ -572,14 +422,14 @@ export function MarkAttendance() {
             )}
 
             {employees.length > 0 && (
-              <div className="d-flex justify-content-between align-items-center mt-4">
+              <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mt-4">
                 <div className="text-muted">
                   <i className="bi bi-info-circle me-2"></i>
                   Manual override will update attendance records for {selectedDate}
                 </div>
-                <div>
+                <div className="d-flex gap-2">
                   <button
-                    className="btn px-4 shadow me-2"
+                    className="btn px-4 shadow"
                     onClick={() => navigate("/admin-dashboard")}
                     style={{ background: '#2b3d4f', color: 'white', borderRadius: '8px', border: 'none' }}
                   >

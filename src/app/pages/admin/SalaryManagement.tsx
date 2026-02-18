@@ -172,13 +172,9 @@ export function SalaryManagement() {
   // Function to fetch all salary records from API
   const fetchSalaries = async () => {
     try {
-      console.log('Fetching salaries from:', `${config.api.host}${config.api.salary}`);
       const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.salary}`);
-      console.log('Salary response status:', response.status);
       if (response.ok) {
         const data = await response.json();
-        console.log('Salary data:', data);
-        // Map records and populate user details
         const records = (data.results || []).map((record: any) => {
           if (typeof record.user === 'number') {
             const emp = employees.find(e => e.id === record.user);
@@ -189,7 +185,6 @@ export function SalaryManagement() {
           }
           return record;
         }).sort((a: SalaryRecord, b: SalaryRecord) => {
-          // Sort by year (descending) then by month (descending)
           const yearA = years.find(y => y.id === a.year)?.year || 0;
           const yearB = years.find(y => y.id === b.year)?.year || 0;
           if (yearB !== yearA) return yearB - yearA;
@@ -197,8 +192,7 @@ export function SalaryManagement() {
         });
         setSalaryRecords(records);
       } else {
-        console.error('Failed to fetch salaries, status:', response.status);
-        toast.error('Failed to fetch salary records. Please check backend.');
+        toast.error('Failed to fetch salary records');
       }
     } catch (error) {
       console.error("Error fetching salaries:", error);
@@ -209,12 +203,10 @@ export function SalaryManagement() {
   // Function to fetch all active employees (excluding admin)
   const fetchEmployees = async () => {
     try {
-      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.user}`);
+      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.user}?is_active=true`);
       if (response.ok) {
         const data = await response.json();
-        // Filter only active employees, exclude admin user
-        const emps = data.results.filter((emp: any) => emp.is_active && emp.username !== 'admin');
-        console.log('Fetched employees with bank info:', emps);
+        const emps = data.results.filter((emp: any) => emp.username !== 'admin');
         setEmployees(emps);
       }
     } catch (error) {
@@ -244,22 +236,14 @@ export function SalaryManagement() {
       const selectedYear = years.find(y => y.id === formData.year)?.year;
       const selectedMonth = MONTHS.find(m => m.value === formData.month)?.label.toLowerCase();
 
-      if (!selectedEmployee?.emp_code || !selectedYear || !selectedMonth) {
-        console.log('Missing required data for attendance search');
-        return;
-      }
+      if (!selectedEmployee?.emp_code || !selectedYear || !selectedMonth) return;
 
       const searchUrl = `${config.api.host}${config.api.attendance}?emp_code=${selectedEmployee.emp_code}&year=${selectedYear}&month=${selectedMonth}`;
-      console.log('Fetching attendance from:', searchUrl);
-
       const response = await makeAuthenticatedRequest(searchUrl);
-      console.log('Attendance response status:', response.status);
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Attendance data received:', data);
         const monthRecords = data.results || data || [];
-        console.log('Month records:', monthRecords);
 
         let presentDays = 0;
         let halfDays = 0;
@@ -273,7 +257,6 @@ export function SalaryManagement() {
         });
 
         const absentDays = formData.total_working_days - presentDays - halfDays;
-        console.log('Calculated - Present:', presentDays, 'Half:', halfDays, 'Absent:', absentDays);
 
         setFormData(prev => ({
           ...prev,
@@ -282,9 +265,6 @@ export function SalaryManagement() {
           absent_days: absentDays,
           attendance: monthRecords[0]?.id || ''
         }));
-      } else {
-        const errorData = await response.text();
-        console.error('Attendance fetch error:', errorData);
       }
     } catch (error) {
       console.error("Error fetching attendance:", error);
@@ -431,10 +411,6 @@ export function SalaryManagement() {
         payload.attendance = formData.attendance;
       }
       
-      console.log('Submitting payload:', payload);
-      console.log('URL:', editingId ? `${config.api.host}${config.api.salary}${editingId}/` : `${config.api.host}${config.api.salary}`);
-      
-      // Make API request (PATCH for update, POST for create)
       const response = await makeAuthenticatedRequest(
         editingId 
           ? `${config.api.host}${config.api.salary}${editingId}/`
@@ -444,8 +420,6 @@ export function SalaryManagement() {
           body: JSON.stringify(payload)
         }
       );
-      
-      console.log('Response status:', response.status);
       
       if (response.ok) {
         const salaryData = await response.json();
@@ -465,8 +439,6 @@ export function SalaryManagement() {
             if (emailResponse.ok) {
               toast.success("Salary email sent to employee");
             } else {
-              const errorData = await emailResponse.json().catch(() => ({}));
-              console.error('Email error:', errorData);
               toast.error("Salary created but failed to send email");
             }
           } catch (emailError) {
@@ -497,9 +469,7 @@ export function SalaryManagement() {
         });
         fetchSalaries(); // Refresh salary list
       } else {
-        // Handle error response
         const errorText = await response.text();
-        console.error('Error response:', errorText);
         let errorMsg = 'Failed to save salary';
         try {
           const errorData = JSON.parse(errorText);
@@ -565,21 +535,15 @@ export function SalaryManagement() {
                 <div className="card-body">
                   <h6 className="mb-3 fw-bold" style={{ color: '#2c3e50' }}><i className="bi bi-person-badge me-2"></i>Employee & Period Details</h6>
                   <div className="row">
-                    <div className="col-md-6 mb-3">
+                    <div className="col-12 col-md-6 mb-3">
                       <label className="form-label fw-semibold text-secondary"><i className="bi bi-person me-1"></i>Employee *</label>
                       <select
                         className="form-select shadow-sm"
                         value={formData.user}
                         onChange={(e) => {
                           const selectedEmp = employees.find(emp => emp.id === parseInt(e.target.value));
-                          console.log('Selected employee:', selectedEmp);
                           if (selectedEmp) {
                             setSelectedEmployeeBankInfo({
-                              bank_name: selectedEmp.bank_name,
-                              bank_account_number: selectedEmp.bank_account_number,
-                              ifsc_code: selectedEmp.ifsc_code
-                            });
-                            console.log('Bank info set:', {
                               bank_name: selectedEmp.bank_name,
                               bank_account_number: selectedEmp.bank_account_number,
                               ifsc_code: selectedEmp.ifsc_code
@@ -605,7 +569,7 @@ export function SalaryManagement() {
                       </select>
                     </div>
 
-                    <div className="col-md-3 mb-3">
+                    <div className="col-12 col-md-3 mb-3">
                       <label className="form-label fw-semibold text-secondary"><i className="bi bi-calendar-event me-1"></i>Year *</label>
                       <select
                         className="form-select shadow-sm"
@@ -623,7 +587,7 @@ export function SalaryManagement() {
                       </select>
                     </div>
 
-                    <div className="col-md-3 mb-3">
+                    <div className="col-12 col-md-3 mb-3">
                       <label className="form-label fw-semibold text-secondary"><i className="bi bi-calendar-month me-1"></i>Month *</label>
                       <select
                         className="form-select shadow-sm"
@@ -649,15 +613,15 @@ export function SalaryManagement() {
                   <div className="card-body">
                     <h6 className="mb-3 fw-bold" style={{ color: '#2c3e50' }}><i className="bi bi-bank me-2"></i>Bank Details</h6>
                     <div className="row">
-                      <div className="col-md-4 mb-3">
+                      <div className="col-12 col-md-4 mb-3">
                         <label className="form-label fw-semibold text-secondary">Bank Name</label>
                         <input type="text" className="form-control" value={selectedEmployeeBankInfo.bank_name || 'Not Available'} readOnly style={{borderRadius: '8px', padding: '10px', background: '#f8f9fa'}} />
                       </div>
-                      <div className="col-md-4 mb-3">
+                      <div className="col-12 col-md-4 mb-3">
                         <label className="form-label fw-semibold text-secondary">Account Number</label>
                         <input type="text" className="form-control" value={selectedEmployeeBankInfo.bank_account_number || 'Not Available'} readOnly style={{borderRadius: '8px', padding: '10px', background: '#f8f9fa'}} />
                       </div>
-                      <div className="col-md-4 mb-3">
+                      <div className="col-12 col-md-4 mb-3">
                         <label className="form-label fw-semibold text-secondary">IFSC Code</label>
                         <input type="text" className="form-control" value={selectedEmployeeBankInfo.ifsc_code || 'Not Available'} readOnly style={{borderRadius: '8px', padding: '10px', background: '#f8f9fa'}} />
                       </div>
@@ -671,10 +635,10 @@ export function SalaryManagement() {
                 <div className="card-body">
                   <h6 className="mb-3 fw-bold" style={{ color: '#2c3e50' }}><i className="bi bi-currency-rupee me-2"></i>Salary Components</h6>
                   <div className="row">
-                    <div className="col-md-4 mb-3">
+                    <div className="col-12 col-md-4 mb-3">
                       <label className="form-label fw-semibold text-secondary">Basic Salary *</label>
                       <div className="input-group shadow-sm">
-                        <span className="input-group-text text-white" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
+                        <span className="input-group-text text-white d-flex align-items-center" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
                         <input
                           type="number"
                           className="form-control"
@@ -687,10 +651,10 @@ export function SalaryManagement() {
                       </div>
                     </div>
 
-                    <div className="col-md-4 mb-3">
+                    <div className="col-12 col-md-4 mb-3">
                       <label className="form-label fw-semibold text-secondary">HRA *</label>
                       <div className="input-group shadow-sm">
-                        <span className="input-group-text text-white" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
+                        <span className="input-group-text text-white d-flex align-items-center" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
                         <input
                           type="number"
                           className="form-control"
@@ -703,10 +667,10 @@ export function SalaryManagement() {
                       </div>
                     </div>
 
-                    <div className="col-md-4 mb-3">
+                    <div className="col-12 col-md-4 mb-3">
                       <label className="form-label fw-semibold text-secondary">Allowance *</label>
                       <div className="input-group shadow-sm">
-                        <span className="input-group-text text-white" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
+                        <span className="input-group-text text-white d-flex align-items-center" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
                         <input
                           type="number"
                           className="form-control"
@@ -803,7 +767,7 @@ export function SalaryManagement() {
                     <div className="col-md-3 mb-3">
                       <label className="form-label fw-semibold text-secondary">PF Amount</label>
                       <div className="input-group shadow-sm">
-                        <span className="input-group-text text-white" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
+                        <span className="input-group-text text-white d-flex align-items-center" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
                         <input
                           type="number"
                           className="form-control"
@@ -818,7 +782,7 @@ export function SalaryManagement() {
                     <div className="col-md-3 mb-3">
                       <label className="form-label fw-semibold text-secondary">Deduction</label>
                       <div className="input-group shadow-sm">
-                        <span className="input-group-text text-white" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
+                        <span className="input-group-text text-white d-flex align-items-center" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
                         <input
                           type="number"
                           className="form-control"
@@ -834,7 +798,7 @@ export function SalaryManagement() {
                     <div className="col-md-3 mb-3">
                       <label className="form-label fw-semibold text-secondary">Net Salary</label>
                       <div className="input-group shadow-sm">
-                        <span className="input-group-text text-white" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
+                        <span className="input-group-text text-white d-flex align-items-center" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
                         <input
                           type="number"
                           className="form-control fw-bold"
@@ -897,9 +861,9 @@ export function SalaryManagement() {
             {salaryRecords.length === 0 ? (
               <p className="text-center text-muted">No salary records found</p>
             ) : (
-              <div className="table-responsive">
+              <div className="table-responsive" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
                 {/* Table displaying all salary records */}
-                <table className="table table-hover">
+                <table className="table table-hover" style={{ minWidth: '1400px' }}>
                   <thead>
                     <tr>
                       <th>Employee</th>

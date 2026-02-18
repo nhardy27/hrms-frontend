@@ -41,7 +41,7 @@ const Login = () => {
         }
 
         // Get user details to determine role
-        const userResponse = await fetch(`${config.api.host}${config.api.user}`, {
+        const userResponse = await fetch(`${config.api.host}${config.api.user}?username=${formData.username}`, {
           headers: {
             Authorization: `Bearer ${data.access}`,
           },
@@ -49,35 +49,23 @@ const Login = () => {
 
         if (userResponse.ok) {
           const userData = await userResponse.json();
-          console.log('User API Response:', userData);
-          console.log('Looking for username:', formData.username);
-          
-          const currentUser = userData.results?.find(
-            (user: any) => user.username === formData.username
-          );
+          const currentUser = userData.results?.[0];
 
           if (currentUser) {
             localStorage.setItem("user", JSON.stringify(currentUser));
-            
-            console.log('Current User:', currentUser);
-            console.log('is_superuser:', currentUser.is_superuser);
-            console.log('is_staff:', currentUser.is_staff);
+            localStorage.setItem("username", formData.username);
+            localStorage.setItem("password", formData.password);
 
             // Redirect based on user role
             if (currentUser.is_superuser === true || currentUser.username === 'admin') {
-              console.log('Redirecting to admin dashboard');
               navigate("/admin-dashboard");
             } else {
-              console.log('Redirecting to employee dashboard');
               navigate("/employee-dashboard");
             }
           } else {
-            console.error('User not found in results');
-            console.error('Available users:', userData.results?.map((u: any) => u.username));
             setError("User not found in system");
           }
         } else {
-          console.error('Failed to fetch user details, status:', userResponse.status);
           setError("Failed to get user details");
         }
       } else {

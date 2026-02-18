@@ -103,17 +103,12 @@ export function EmployeeList() {
   const fetchEmployees = async () => {
     setLoading(true);
     try {
-      console.log('Fetching all employees...');
       const allEmployees = await fetchAllPages(`${config.api.host}${config.api.user}`);
       
-      console.log('All employees from all pages:', allEmployees.length);
-      
-      // Filter out superusers and admin users
       const regularEmployees = allEmployees.filter((emp: Employee) => 
         !emp.is_superuser && emp.username !== 'admin'
       );
       
-      // Map department names to employees
       const employeesWithDepartments = regularEmployees.map((emp: Employee) => {
         const department = departments.find(dept => dept.id.toString() === emp.department.toString());
         return {
@@ -122,10 +117,8 @@ export function EmployeeList() {
         };
       });
       
-      // Sort by ID in descending order (latest first)
       employeesWithDepartments.sort((a, b) => parseInt(b.id) - parseInt(a.id));
       
-      console.log('Final employees with departments:', employeesWithDepartments);
       setEmployees(employeesWithDepartments);
       setFilteredEmployees(employeesWithDepartments);
       setTotalPages(Math.ceil(employeesWithDepartments.length / itemsPerPage));
@@ -163,24 +156,24 @@ export function EmployeeList() {
       <div className="container-fluid p-4">
         <div className="card border-0 shadow-lg mb-4" style={{ borderRadius: '15px', background: '#ffffff' }}>
           <div className="card-body p-3">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
+            <div className="d-flex flex-column flex-md-row justify-content-between align-items-start gap-2">
+              <div className="w-100 w-md-auto">
                 <h4 className="mb-1" style={{ color: '#2c3e50' }}><i className="bi bi-people-fill me-2"></i>Employees</h4>
                 <small className="opacity-75" style={{ color: '#7f8c8d' }}>
                   Total: {employees.length} employees | 
                   Showing: {Math.min((currentPage - 1) * itemsPerPage + 1, filteredEmployees.length)}-{Math.min(currentPage * itemsPerPage, filteredEmployees.length)} of {filteredEmployees.length}
                 </small>
               </div>
-              <div className="d-flex gap-2">
+              <div className="d-flex flex-column flex-md-row gap-2 align-items-stretch align-items-md-center w-100 w-md-auto">
                 <input
                   type="text"
                   className="form-control"
                   placeholder="Search employees..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  style={{ width: '250px', borderRadius: '8px' }}
+                  style={{ maxWidth: '250px', borderRadius: '8px' }}
                 />
-                <Link to="/employees/add" className="btn px-4 shadow" style={{ background: '#3498db', color: 'white', borderRadius: '8px', border: 'none' }}>
+                <Link to="/employees/add" className="btn px-4 shadow" style={{ background: '#3498db', color: 'white', borderRadius: '8px', border: 'none', whiteSpace: 'nowrap' }}>
                   <i className="bi bi-plus-circle me-2"></i>
                   Add Employee
                 </Link>
@@ -191,8 +184,8 @@ export function EmployeeList() {
 
         <div className="card border-0 shadow-lg" style={{ borderRadius: '15px' }}>
           <div className="card-body">
-            <div className="table-responsive">
-              <table className="table table-hover align-middle">
+            <div className="table-responsive" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <table className="table table-hover align-middle" style={{ minWidth: '1400px' }}>
                 <thead>
                   <tr>
                     <th style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>ID</th>

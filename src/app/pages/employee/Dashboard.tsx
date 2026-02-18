@@ -20,6 +20,7 @@ export function EmployeeDashboard() {
   const [activeTab, setActiveTab] = useState('profile');
   const [attendanceStatusId, setAttendanceStatusId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -248,30 +249,50 @@ export function EmployeeDashboard() {
     <div className="min-vh-100 d-flex" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>
       <Toaster position="bottom-center" />
       
+      {/* Mobile Overlay */}
+      {mobileMenuOpen && (
+        <div 
+          className="d-md-none position-fixed w-100 h-100" 
+          style={{ background: 'rgba(0,0,0,0.5)', zIndex: 999, top: 0, left: 0 }}
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+      
       {/* Sidebar */}
-      <div className={`${sidebarCollapsed ? 'collapsed-sidebar' : 'sidebar'}`} style={{
-        width: sidebarCollapsed ? '80px' : '260px',
-        transition: 'width 0.3s',
-        position: 'fixed',
-        height: '100vh',
-        overflowY: 'auto',
-        zIndex: 1000,
-        background: '#ffffff',
-        borderRight: '1px solid #e9ecef'
-      }}>
+      <div 
+        className={`${mobileMenuOpen ? 'd-block' : 'd-none'} d-md-block`} 
+        style={{
+          width: sidebarCollapsed ? '80px' : '260px',
+          transition: 'all 0.3s',
+          position: 'fixed',
+          height: '100vh',
+          overflowY: 'auto',
+          zIndex: 1000,
+          background: '#ffffff',
+          borderRight: '1px solid #e9ecef',
+          left: 0,
+          top: 0
+        }}
+      >
         <div className="p-3 d-flex justify-content-between align-items-center" style={{ borderBottom: '1px solid #e9ecef' }}>
           {!sidebarCollapsed && (
             <div className="d-flex align-items-center gap-2">
               <img src="/Logo.png" alt="HR System" style={{ height: '40px', objectFit: 'contain' }} />
-              <h5 className="mb-0" style={{ color: '#2c3e50', textTransform: 'uppercase' }}>{employee?.first_name}</h5>
+              <h5 className="mb-0 d-none d-md-block" style={{ color: '#2c3e50', textTransform: 'uppercase' }}>{employee?.first_name}</h5>
             </div>
           )}
           <button 
-            className="btn btn-sm btn-outline-dark" 
+            className="btn btn-sm btn-outline-dark d-none d-md-block" 
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             style={{ marginLeft: sidebarCollapsed ? 'auto' : '0', marginRight: sidebarCollapsed ? 'auto' : '0' }}
           >
             <i className="bi bi-layout-sidebar-inset"></i>
+          </button>
+          <button 
+            className="btn btn-sm btn-outline-dark d-md-none ms-auto" 
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <i className="bi bi-x-lg"></i>
           </button>
         </div>
         
@@ -279,7 +300,10 @@ export function EmployeeDashboard() {
           {menuItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => {
+                setActiveTab(item.id);
+                setMobileMenuOpen(false);
+              }}
               className="nav-link text-dark rounded mb-2 d-flex align-items-center"
               style={{
                 padding: '12px 16px',
@@ -309,9 +333,25 @@ export function EmployeeDashboard() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-grow-1" style={{ marginLeft: sidebarCollapsed ? '80px' : '260px', transition: 'margin-left 0.3s' }}>
+      <div 
+        className="flex-grow-1" 
+        style={{ 
+          marginLeft: window.innerWidth >= 768 ? (sidebarCollapsed ? '80px' : '260px') : '0',
+          transition: 'margin-left 0.3s',
+          width: '100%',
+          maxWidth: '100vw',
+          overflowX: 'hidden'
+        }}
+      >
         <nav className="navbar navbar-expand-lg shadow-sm" style={{ background: '#ffffff', borderBottom: '1px solid #e9ecef' }}>
           <div className="container-fluid">
+            <button 
+              className="btn btn-link d-md-none me-2" 
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              style={{ color: '#2c3e50', textDecoration: 'none' }}
+            >
+              <i className="bi bi-list fs-4"></i>
+            </button>
             <span className="navbar-brand fw-bold" style={{ color: '#2c3e50' }}>Employee Portal - {employee?.first_name?.toUpperCase()}</span>
             <div className="navbar-nav ms-auto">
               <button className="nav-link btn btn-link" onClick={handleLogout} style={{ color: '#2c3e50', textDecoration: 'none', cursor: 'pointer' }}>
@@ -321,9 +361,9 @@ export function EmployeeDashboard() {
           </div>
         </nav>
         
-        <div className="container-fluid p-4">
-          <div className="row mb-4">
-            <div className="col-md-6">
+        <div className="container-fluid p-4" style={{ maxWidth: '100%', overflowX: 'hidden' }}>
+          <div className="row mb-4 g-3">
+            <div className="col-12 col-md-6">
               <div className="card shadow-sm border-0" style={{ background: '#ffffff' }}>
                 <div className="card-body text-center">
                   <i className="bi bi-box-arrow-in-right fs-1 mb-2" style={{ color: '#2c3e50' }}></i>
@@ -339,7 +379,7 @@ export function EmployeeDashboard() {
                 </div>
               </div>
             </div>
-            <div className="col-md-6">
+            <div className="col-12 col-md-6">
               <div className="card shadow-sm border-0" style={{ background: '#ffffff' }}>
                 <div className="card-body text-center">
                   <i className="bi bi-box-arrow-right fs-1 mb-2" style={{ color: '#2c3e50' }}></i>
