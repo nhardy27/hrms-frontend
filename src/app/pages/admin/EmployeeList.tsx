@@ -49,20 +49,28 @@ export function EmployeeList() {
     };
     initializeData();
     
-    // Listen for focus events to refresh data when returning from other pages
     const handleFocus = () => {
-      fetchEmployees();
+      fetchDepartments().then(() => fetchEmployees());
+    };
+    
+    const handleDepartmentChange = () => {
+      fetchDepartments().then(() => fetchEmployees());
     };
     
     window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
+    window.addEventListener('departmentChanged', handleDepartmentChange);
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('departmentChanged', handleDepartmentChange);
+    };
   }, []);
 
   useEffect(() => {
     if (departments.length > 0) {
       fetchEmployees();
     }
-  }, [currentPage, departments]);
+  }, [departments]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -110,10 +118,16 @@ export function EmployeeList() {
       );
       
       const employeesWithDepartments = regularEmployees.map((emp: Employee) => {
-        const department = departments.find(dept => dept.id.toString() === emp.department.toString());
+        if (emp.department) {
+          const department = departments.find(dept => dept.id.toString() === emp.department.toString());
+          return {
+            ...emp,
+            department_name: department ? department.name : 'N/A'
+          };
+        }
         return {
           ...emp,
-          department_name: department ? department.name : 'N/A'
+          department_name: 'N/A'
         };
       });
       

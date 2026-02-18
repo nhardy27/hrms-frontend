@@ -181,6 +181,18 @@ export function EmployeeForm() {
 
   useEffect(() => {
     fetchDepartments();
+    
+    const handleDepartmentChange = () => {
+      fetchDepartments().then(() => {
+        if (isEdit) fetchEmployee();
+      });
+    };
+    
+    window.addEventListener('departmentChanged', handleDepartmentChange);
+    return () => window.removeEventListener('departmentChanged', handleDepartmentChange);
+  }, []);
+
+  useEffect(() => {
     if (isEdit) {
       fetchEmployee();
     } else {
@@ -193,7 +205,15 @@ export function EmployeeForm() {
       const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.department}?status=true`);
       if (response.ok) {
         const data = await response.json();
-        setDepartments(data.results || data || []);
+        const activeDepts = data.results || data || [];
+        setDepartments(activeDepts);
+        
+        if (isEdit && formData.department) {
+          const deptExists = activeDepts.find((d: Department) => d.id === formData.department);
+          if (!deptExists && formData.department) {
+            setFormData(prev => ({ ...prev, department: '' }));
+          }
+        }
       }
     } catch (error) {
       console.error('Error fetching departments:', error);
