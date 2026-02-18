@@ -57,9 +57,8 @@ export function EmployeeDashboard() {
       const currentUserId = userData.id;
       
       // Single API call to get all data
-      const [userRes, deptRes, attRes, attStatusRes, leaveRes] = await Promise.all([
+      const [userRes, attRes, attStatusRes, leaveRes] = await Promise.all([
         makeAuthenticatedRequest(`${config.api.host}${config.api.user}`),
-        makeAuthenticatedRequest(`${config.api.host}${config.api.department}`),
         makeAuthenticatedRequest(`${config.api.host}${config.api.attendance}`),
         makeAuthenticatedRequest(`${config.api.host}${config.api.attendanceStatus}`),
         makeAuthenticatedRequest(`${config.api.host}${config.api.leave}`)
@@ -70,13 +69,6 @@ export function EmployeeDashboard() {
         const usersData = await userRes.json();
         const apiUserData = (usersData.results || []).find((u: any) => u.id === currentUserId);
         
-        let departmentName = 'N/A';
-        if (apiUserData?.department && deptRes.ok) {
-          const deptData = await deptRes.json();
-          const dept = (deptData.results || []).find((d: any) => d.id === apiUserData.department);
-          departmentName = dept?.name || 'N/A';
-        }
-        
         setEmployee({
           id: (apiUserData?.id || currentUserId).toString(),
           emp_code: apiUserData?.emp_code || 'N/A',
@@ -84,8 +76,10 @@ export function EmployeeDashboard() {
           last_name: apiUserData?.last_name || '',
           email: apiUserData?.email || userData.email || 'N/A',
           username: apiUserData?.username || userData.username || 'N/A',
-          department_name: departmentName,
-          designation: apiUserData?.designation || 'N/A'
+          department_name: apiUserData?.department_name || 'N/A',
+          designation: apiUserData?.designation || 'N/A',
+          contact_no: apiUserData?.contact_no || 'N/A',
+          date_of_joining: apiUserData?.date_of_joining || 'N/A'
         });
       }
       
@@ -109,7 +103,7 @@ export function EmployeeDashboard() {
       if (attRes.ok) {
         const attData = await attRes.json();
         const userAttendances = (attData.results || []).filter((att: Attendance) => att.user === currentUserId);
-        setAttendances(userAttendances.slice(0, 5));
+        setAttendances(userAttendances);
         
         const today = new Date().toISOString().split('T')[0];
         const todayRecord = userAttendances.find((att: Attendance) => att.date === today);

@@ -593,11 +593,15 @@ export function SalaryManagement() {
                         style={{borderRadius: '8px', padding: '10px', border: '1px solid #dee2e6', background: '#ffffff'}}
                       >
                         <option value="">Select Employee</option>
-                        {employees.map(emp => (
-                          <option key={emp.id} value={emp.id}>
-                            {emp.first_name} {emp.last_name} - {emp.emp_code || 'N/A'}
-                          </option>
-                        ))}
+                        {employees.map(emp => {
+                          const empSalary = salaryRecords.find(s => s.user?.id === emp.id && s.month === formData.month && s.year === formData.year);
+                          const status = empSalary ? (empSalary.payment_status === 'paid' ? ' ✅ Paid' : ' ⚠️ Unpaid') : ' 🔴 Not Created';
+                          return (
+                            <option key={emp.id} value={emp.id}>
+                              {emp.first_name} {emp.last_name} - {emp.emp_code || 'N/A'}{status}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
 
