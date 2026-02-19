@@ -3,6 +3,7 @@ import config from "../../../config/global.json";
 import { makeAuthenticatedRequest } from '../../../utils/apiUtils';
 import toast, { Toaster } from 'react-hot-toast';
 import { AdminLayout } from '../../components/AdminLayout';
+import { LoadingAnimation } from '../../components/LoadingAnimation';
 
 interface LeaveRequest {
   id: string;
@@ -103,6 +104,7 @@ export function LeaveManagement() {
 
   return (
     <AdminLayout title="Leave Management">
+      {loading && <LoadingAnimation />}
       <Toaster position="bottom-center" />
       <div className="container-fluid p-4">
         <div className="card border-0 shadow-lg" style={{ borderRadius: '15px' }}>

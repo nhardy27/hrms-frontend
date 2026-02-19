@@ -1,6 +1,7 @@
 import { useState, ChangeEvent, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import config from "../../config/global.json";
+import { LoadingAnimation } from "../components/LoadingAnimation";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -78,6 +79,10 @@ const Login = () => {
       setLoading(false);
     }
   };
+
+  if (loading) {
+    return <LoadingAnimation />;
+  }
 
   return (
     <div className="min-vh-100 d-flex align-items-center justify-content-center" style={{ background: '#f8f9fa' }}>

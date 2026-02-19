@@ -10,6 +10,7 @@ import config from "../../../config/global.json";
 import { makeAuthenticatedRequest } from "../../../utils/apiUtils";
 // Reusable Admin Layout component
 import { AdminLayout } from "../../components/AdminLayout";
+import { LoadingAnimation } from "../../components/LoadingAnimation";
 
 export function AdminDashboard() {
   // Hook to programmatically navigate between routes
@@ -105,6 +106,7 @@ export function AdminDashboard() {
 
   return (
     <AdminLayout title="Admin Dashboard">
+      {loading && <LoadingAnimation />}
       {/* Toast notification container */}
       <Toaster position="bottom-center" />
 

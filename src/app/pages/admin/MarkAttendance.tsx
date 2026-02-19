@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom";
 import toast, { Toaster } from 'react-hot-toast';
 import config from "../../../config/global.json";
 import { AdminLayout } from '../../components/AdminLayout';
-import { fetchAllPages, makeAuthenticatedRequest } from '../../../utils/apiUtils';
+import { makeAuthenticatedRequest } from '../../../utils/apiUtils';
+import { LoadingAnimation } from '../../components/LoadingAnimation';
 
 interface Employee {
   id: string;
@@ -63,8 +64,8 @@ export function MarkAttendance() {
       await fetchEmployeesAndAttendance();
     };
     
-    initializeData().catch(error => {
-            toast.error('Failed to load data');
+    initializeData().catch(() => {
+      toast.error('Failed to load data');
       setDataLoading(false);
     });
   }, []);
@@ -257,6 +258,7 @@ export function MarkAttendance() {
 
   return (
     <AdminLayout title="Mark Attendance">
+      {dataLoading && <LoadingAnimation />}
       <Toaster position="bottom-center" />
       <div className="container-fluid p-4">
         <div className="card border-0 shadow-lg" style={{ borderRadius: '15px' }}>

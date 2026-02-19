@@ -4,6 +4,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import config from '../../../config/global.json';
 import { makeAuthenticatedRequest } from '../../../utils/apiUtils';
 import { AdminLayout } from '../../components/AdminLayout';
+import { LoadingAnimation } from '../../components/LoadingAnimation';
 
 interface Employee {
   id: string;
@@ -184,6 +185,7 @@ export function EmployeeList() {
 
   return (
     <AdminLayout title="Employee Management">
+      {loading && <LoadingAnimation />}
       <Toaster position="bottom-center" />
       <div className="container-fluid p-4">
         <div className="card border-0 shadow-lg mb-4" style={{ borderRadius: '15px', background: '#ffffff' }}>
@@ -245,18 +247,9 @@ export function EmployeeList() {
                   </tr>
                 </thead>
                 <tbody>
-                  {loading ? (
-                    <tr>
-                      <td colSpan={11} className="text-center">Loading...</td>
-                    </tr>
-                  ) : employees.length === 0 ? (
-                    <tr>
-                      <td colSpan={11} className="text-center">No employees found</td>
-                    </tr>
-                  ) : (
-                    employees
-                      .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-                      .map((employee) => (
+                  {employees
+                    .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                    .map((employee) => (
                       <tr key={employee.id}>
                         <td style={{ verticalAlign: 'middle' }}><strong>{employee.id}</strong></td>
                         <td style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>{employee.emp_code || `EMP${employee.id.toString().padStart(3, '0')}`}</td>
@@ -297,8 +290,7 @@ export function EmployeeList() {
                           </div>
                         </td>
                       </tr>
-                    ))
-                  )}
+                    ))}
                 </tbody>
               </table>
             </div>
