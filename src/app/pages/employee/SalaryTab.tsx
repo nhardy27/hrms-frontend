@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import toast from 'react-hot-toast';
 import config from "../../../config/global.json";
 import { makeAuthenticatedRequest } from '../../../utils/apiUtils';
+import { LoadingAnimation } from '../../components/LoadingAnimation';
 
 interface SalaryRecord {
   id: string;
@@ -67,7 +68,7 @@ export function SalaryTab() {
   };
 
   if (loading) {
-    return <div className="text-center py-4"><div className="spinner-border"></div></div>;
+    return <LoadingAnimation />;
   }
 
   const totalPF = salaries.reduce((sum, salary) => sum + parseFloat(salary.pf_amount || '0'), 0);

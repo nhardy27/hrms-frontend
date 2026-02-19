@@ -20,7 +20,6 @@ export function EmployeeDashboard() {
   const [hasCheckedOut, setHasCheckedOut] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
   const [attendanceStatusId, setAttendanceStatusId] = useState<string | null>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -254,8 +253,7 @@ export function EmployeeDashboard() {
       <div 
         className={`${mobileMenuOpen ? 'd-block' : 'd-none'} d-md-block`} 
         style={{
-          width: sidebarCollapsed ? '80px' : '260px',
-          transition: 'all 0.3s',
+          width: '260px',
           position: 'fixed',
           height: '100vh',
           overflowY: 'auto',
@@ -267,19 +265,10 @@ export function EmployeeDashboard() {
         }}
       >
         <div className="p-3 d-flex justify-content-between align-items-center" style={{ borderBottom: '1px solid #e9ecef' }}>
-          {!sidebarCollapsed && (
-            <div className="d-flex align-items-center gap-2">
-              <img src="/Logo.png" alt="HR System" style={{ height: '40px', objectFit: 'contain' }} />
-              <h5 className="mb-0 d-none d-md-block" style={{ color: '#2c3e50', textTransform: 'uppercase' }}>{employee?.first_name}</h5>
-            </div>
-          )}
-          <button 
-            className="btn btn-sm btn-outline-dark d-none d-md-block" 
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            style={{ marginLeft: sidebarCollapsed ? 'auto' : '0', marginRight: sidebarCollapsed ? 'auto' : '0' }}
-          >
-            <i className="bi bi-layout-sidebar-inset"></i>
-          </button>
+          <div className="d-flex align-items-center gap-2">
+            <img src="/Logo.png" alt="HR System" style={{ height: '40px', objectFit: 'contain' }} />
+            <h5 className="mb-0 d-none d-md-block" style={{ color: '#2c3e50', textTransform: 'uppercase' }}>{employee?.first_name}</h5>
+          </div>
           <button 
             className="btn btn-sm btn-outline-dark d-md-none ms-auto" 
             onClick={() => setMobileMenuOpen(false)}
@@ -307,7 +296,7 @@ export function EmployeeDashboard() {
               }}
             >
               <i className={`bi ${item.icon} fs-5`} style={{ minWidth: '24px' }}></i>
-              {!sidebarCollapsed && <span className="ms-3">{item.label}</span>}
+              <span className="ms-3">{item.label}</span>
             </button>
           ))}
         </nav>
@@ -319,7 +308,7 @@ export function EmployeeDashboard() {
             style={{ border: '1px solid #dee2e6' }}
           >
             <i className="bi bi-box-arrow-right"></i>
-            {!sidebarCollapsed && <span className="ms-2">Logout</span>}
+            <span className="ms-2">Logout</span>
           </button>
         </div>
       </div>
@@ -328,8 +317,7 @@ export function EmployeeDashboard() {
       <div 
         className="flex-grow-1" 
         style={{ 
-          marginLeft: window.innerWidth >= 768 ? (sidebarCollapsed ? '80px' : '260px') : '0',
-          transition: 'margin-left 0.3s',
+          marginLeft: window.innerWidth >= 768 ? '260px' : '0',
           width: '100%',
           maxWidth: '100vw',
           overflowX: 'hidden'
