@@ -39,6 +39,9 @@ export function MarkAttendance() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
   const [loading, setLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     const initializeData = async () => {
@@ -59,17 +62,16 @@ export function MarkAttendance() {
     };
     
     initializeData().catch(error => {
-      console.error('Initialization error:', error);
-      toast.error('Failed to load data');
+            toast.error('Failed to load data');
       setDataLoading(false);
     });
   }, []);
 
   useEffect(() => {
-    if (employees.length > 0) {
+    if (employees.length > 0 || currentPage === 1) {
       fetchEmployeesAndAttendance();
     }
-  }, [selectedDate]);
+  }, [selectedDate, currentPage]);
 
   const getEmployeeAttendance = (employeeId: string): AttendanceData | null => {
     return existingAttendance.find(att => att.user.toString() === employeeId.toString()) || null;
@@ -78,32 +80,39 @@ export function MarkAttendance() {
   const fetchEmployeesAndAttendance = async () => {
     setDataLoading(true);
     try {
-      const allEmployees = await fetchAllPages(`${config.api.host}${config.api.user}`);
-      
-      const processedEmployees = allEmployees
-        .filter((emp: any) => emp.is_active && emp.username !== 'admin')
-        .map((emp: any) => ({
-          id: emp.id.toString(),
-          emp_code: `EMP${emp.id.toString().padStart(3, '0')}`,
-          first_name: emp.first_name || emp.username,
-          last_name: emp.last_name || '',
-          department: emp.department || '',
-          department_name: emp.department_name || 'N/A',
-          is_active: emp.is_active
-        }));
-      
-      setEmployees(processedEmployees);
-      
-      const attendanceUrl = `${config.api.host}${config.api.attendance}?date=${selectedDate}`;
-      const response = await makeAuthenticatedRequest(attendanceUrl);
+      const url = `${config.api.host}${config.api.user}?page=${currentPage}`;
+      const response = await makeAuthenticatedRequest(url);
       
       if (response.ok) {
         const data = await response.json();
-        setExistingAttendance(data.results || []);
+        const allEmployees = data.results || [];
+        
+        const processedEmployees = allEmployees
+          .filter((emp: any) => emp.is_active && emp.username !== 'admin')
+          .map((emp: any) => ({
+            id: emp.id.toString(),
+            emp_code: `EMP${emp.id.toString().padStart(3, '0')}`,
+            first_name: emp.first_name || emp.username,
+            last_name: emp.last_name || '',
+            department: emp.department || '',
+            department_name: emp.department_name || 'N/A',
+            is_active: emp.is_active
+          }));
+        
+        setEmployees(processedEmployees);
+        setTotalCount(data.count || 0);
+        setTotalPages(Math.ceil((data.count || 0) / 10));
+      }
+      
+      const attendanceUrl = `${config.api.host}${config.api.attendance}?date=${selectedDate}`;
+      const attResponse = await makeAuthenticatedRequest(attendanceUrl);
+      
+      if (attResponse.ok) {
+        const attData = await attResponse.json();
+        setExistingAttendance(attData.results || []);
       }
     } catch (error) {
-      console.error("Error fetching data:", error);
-      toast.error('Failed to load attendance data');
+            toast.error('Failed to load attendance data');
     } finally {
       setDataLoading(false);
     }
@@ -164,10 +173,11 @@ export function MarkAttendance() {
           
           if (Object.keys(updateData).length === 0) return { success: false };
           
-          return makeAuthenticatedRequest(
+          const res = await makeAuthenticatedRequest(
             `${config.api.host}${config.api.attendance}${existingAttendance.id}/`,
             { method: 'PATCH', body: JSON.stringify(updateData) }
-          ).then(res => ({ success: res.ok }));
+          );
+          return { success: res.ok };
         } else {
           if (!manualTime.check_in && !manualTime.check_out) return { success: false };
           
@@ -202,10 +212,11 @@ export function MarkAttendance() {
             if (createData[key] === null || createData[key] === undefined) delete createData[key];
           });
           
-          return makeAuthenticatedRequest(
+          const res = await makeAuthenticatedRequest(
             `${config.api.host}${config.api.attendance}`,
             { method: 'POST', body: JSON.stringify(createData) }
-          ).then(res => ({ success: res.ok }));
+          );
+          return { success: res.ok };
         }
       });
 
@@ -245,15 +256,23 @@ export function MarkAttendance() {
 
           <div className="card-body">
             <div className="row mb-3 g-3">
-              <div className="col-12 col-md-6">
+              <div className="col-12 col-md-4">
                 <div className="card border-0 shadow-sm" style={{ borderRadius: '12px', background: '#0e0e0e' }}>
                   <div className="card-body text-center text-white">
-                    <h4 className="fw-bold">{employees.length}</h4>
+                    <h4 className="fw-bold">{totalCount}</h4>
                     <p className="mb-0">Total Employees</p>
                   </div>
                 </div>
               </div>
-              <div className="col-12 col-md-6">
+              <div className="col-12 col-md-4">
+                <div className="card border-0 shadow-sm" style={{ borderRadius: '12px', background: '#0e0e0e' }}>
+                  <div className="card-body text-center text-white">
+                    <h4 className="fw-bold">{employees.length}</h4>
+                    <p className="mb-0">On This Page</p>
+                  </div>
+                </div>
+              </div>
+              <div className="col-12 col-md-4">
                 <div className="card border-0 shadow-sm" style={{ borderRadius: '12px', background: '#0e0e0e' }}>
                   <div className="card-body text-center text-white">
                     <h4 className="fw-bold">
@@ -422,30 +441,64 @@ export function MarkAttendance() {
             )}
 
             {employees.length > 0 && (
-              <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mt-4">
-                <div className="text-muted">
-                  <i className="bi bi-info-circle me-2"></i>
-                  Manual override will update attendance records for {selectedDate}
+              <>
+                <nav className="mt-3">
+                  <ul className="pagination mb-0">
+                    <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                      <button 
+                        className="page-link" 
+                        onClick={() => setCurrentPage(prev => prev - 1)}
+                        disabled={currentPage === 1}
+                      >
+                        Previous
+                      </button>
+                    </li>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <li key={page} className={`page-item ${currentPage === page ? 'active' : ''}`}>
+                        <button className="page-link" onClick={() => setCurrentPage(page)}>
+                          {page}
+                        </button>
+                      </li>
+                    ))}
+                    <li className={`page-item ${currentPage >= totalPages ? 'disabled' : ''}`}>
+                      <button 
+                        className="page-link" 
+                        onClick={() => setCurrentPage(prev => prev + 1)}
+                        disabled={currentPage >= totalPages}
+                      >
+                        Next
+                      </button>
+                    </li>
+                  </ul>
+                  <div className="mt-2 text-muted small">
+                    Page {currentPage} of {totalPages} (Total: {totalCount} employees)
+                  </div>
+                </nav>
+                <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mt-4">
+                  <div className="text-muted">
+                    <i className="bi bi-info-circle me-2"></i>
+                    Manual override will update attendance records for {selectedDate}
+                  </div>
+                  <div className="d-flex gap-2">
+                    <button
+                      className="btn px-4 shadow"
+                      onClick={() => navigate("/admin-dashboard")}
+                      style={{ background: '#2b3d4f', color: 'white', borderRadius: '8px', border: 'none' }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className="btn text-white px-4 shadow"
+                      onClick={handleSubmit}
+                      disabled={loading}
+                      style={{ background: '#3498db', borderRadius: '8px', border: 'none' }}
+                    >
+                      <i className="bi bi-check-circle me-2"></i>
+                      {loading ? "Saving..." : "Save Attendance"}
+                    </button>
+                  </div>
                 </div>
-                <div className="d-flex gap-2">
-                  <button
-                    className="btn px-4 shadow"
-                    onClick={() => navigate("/admin-dashboard")}
-                    style={{ background: '#2b3d4f', color: 'white', borderRadius: '8px', border: 'none' }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    className="btn text-white px-4 shadow"
-                    onClick={handleSubmit}
-                    disabled={loading}
-                    style={{ background: '#3498db', borderRadius: '8px', border: 'none' }}
-                  >
-                    <i className="bi bi-check-circle me-2"></i>
-                    {loading ? "Saving..." : "Save Attendance"}
-                  </button>
-                </div>
-              </div>
+              </>
             )}
           </div>
         </div>

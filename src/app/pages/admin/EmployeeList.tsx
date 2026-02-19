@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import toast, { Toaster } from 'react-hot-toast';
 import config from '../../../config/global.json';
-import { fetchAllPages, makeAuthenticatedRequest } from '../../../utils/apiUtils';
+import { makeAuthenticatedRequest } from '../../../utils/apiUtils';
 import { AdminLayout } from '../../components/AdminLayout';
 
 interface Employee {
@@ -35,10 +35,11 @@ interface Department {
 
 export function EmployeeList() {
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
+  const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const itemsPerPage = 10;
@@ -49,12 +50,14 @@ export function EmployeeList() {
     };
     initializeData();
     
-    const handleFocus = () => {
-      fetchDepartments().then(() => fetchEmployees());
+    const handleFocus = async () => {
+      await fetchDepartments();
+      await fetchEmployees();
     };
     
-    const handleDepartmentChange = () => {
-      fetchDepartments().then(() => fetchEmployees());
+    const handleDepartmentChange = async () => {
+      await fetchDepartments();
+      await fetchEmployees();
     };
     
     window.addEventListener('focus', handleFocus);
@@ -67,32 +70,15 @@ export function EmployeeList() {
   }, []);
 
   useEffect(() => {
-    if (departments.length > 0) {
+    if (departments.length > 0 && allEmployees.length === 0) {
       fetchEmployees();
     }
   }, [departments]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchTerm) {
-        const filtered = employees.filter(emp => 
-          emp.emp_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          emp.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          emp.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          emp.department_name?.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-        setFilteredEmployees(filtered);
-        setTotalPages(Math.ceil(filtered.length / itemsPerPage));
-        setCurrentPage(1);
-      } else {
-        setFilteredEmployees(employees);
-        setTotalPages(Math.ceil(employees.length / itemsPerPage));
-      }
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [searchTerm, employees]);
+    setCurrentPage(1);
+    filterEmployees();
+  }, [searchTerm, allEmployees]);
 
   const fetchDepartments = async () => {
     try {
@@ -104,41 +90,74 @@ export function EmployeeList() {
         setDepartments(data.results || []);
       }
     } catch (error) {
-      console.error('Error fetching departments:', error);
+          }
+  };
+
+  const filterEmployees = () => {
+    let filtered = allEmployees;
+    
+    if (searchTerm) {
+      filtered = allEmployees.filter(emp => 
+        emp.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.emp_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.department_name?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
     }
+    
+    setEmployees(filtered);
+    setTotalCount(filtered.length);
+    setTotalPages(Math.ceil(filtered.length / itemsPerPage));
   };
 
   const fetchEmployees = async () => {
     setLoading(true);
     try {
-      const allEmployees = await fetchAllPages(`${config.api.host}${config.api.user}`);
+      let allData: Employee[] = [];
+      let page = 1;
+      let hasMore = true;
       
-      const regularEmployees = allEmployees.filter((emp: Employee) => 
-        !emp.is_superuser && emp.username !== 'admin'
-      );
-      
-      const employeesWithDepartments = regularEmployees.map((emp: Employee) => {
-        if (emp.department) {
-          const department = departments.find(dept => dept.id.toString() === emp.department.toString());
-          return {
-            ...emp,
-            department_name: department ? department.name : 'N/A'
-          };
+      while (hasMore) {
+        const url = `${config.api.host}${config.api.user}?page=${page}`;
+        const response = await makeAuthenticatedRequest(url);
+        
+        if (response.ok) {
+          const data = await response.json();
+          const pageEmployees = data.results || [];
+          
+          const regularEmployees = pageEmployees.filter((emp: Employee) => 
+            !emp.is_superuser && emp.username !== 'admin'
+          );
+          
+          const employeesWithDepartments = regularEmployees.map((emp: Employee) => {
+            if (emp.department) {
+              const department = departments.find(dept => dept.id.toString() === emp.department.toString());
+              return {
+                ...emp,
+                department_name: department ? department.name : 'N/A'
+              };
+            }
+            return {
+              ...emp,
+              department_name: 'N/A'
+            };
+          });
+          
+          allData = [...allData, ...employeesWithDepartments];
+          hasMore = !!data.next;
+          page++;
+        } else {
+          hasMore = false;
         }
-        return {
-          ...emp,
-          department_name: 'N/A'
-        };
-      });
+      }
       
-      employeesWithDepartments.sort((a, b) => parseInt(b.id) - parseInt(a.id));
-      
-      setEmployees(employeesWithDepartments);
-      setFilteredEmployees(employeesWithDepartments);
-      setTotalPages(Math.ceil(employeesWithDepartments.length / itemsPerPage));
+      setAllEmployees(allData);
+      setEmployees(allData);
+      setTotalCount(allData.length);
+      setTotalPages(Math.ceil(allData.length / itemsPerPage));
     } catch (error) {
-      console.error('Error fetching employees:', error);
-      toast.error('Error loading employees');
+            toast.error('Error loading employees');
     } finally {
       setLoading(false);
     }
@@ -158,8 +177,7 @@ export function EmployeeList() {
           toast.error('Failed to delete employee');
         }
       } catch (error) {
-        console.error('Error deleting employee:', error);
-        toast.error('Error deleting employee');
+                toast.error('Error deleting employee');
       }
     }
   };
@@ -169,27 +187,38 @@ export function EmployeeList() {
       <Toaster position="bottom-center" />
       <div className="container-fluid p-4">
         <div className="card border-0 shadow-lg mb-4" style={{ borderRadius: '15px', background: '#ffffff' }}>
-          <div className="card-body p-3">
-            <div className="d-flex flex-column flex-md-row justify-content-between align-items-start gap-2">
-              <div className="w-100 w-md-auto">
-                <h4 className="mb-1" style={{ color: '#2c3e50' }}><i className="bi bi-people-fill me-2"></i>Employees</h4>
-                <small className="opacity-75" style={{ color: '#7f8c8d' }}>
-                  Total: {employees.length} employees | 
-                  Showing: {Math.min((currentPage - 1) * itemsPerPage + 1, filteredEmployees.length)}-{Math.min(currentPage * itemsPerPage, filteredEmployees.length)} of {filteredEmployees.length}
+          <div className="card-body p-4">
+            <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+              <div>
+                <h4 className="mb-1" style={{ color: '#2c3e50' }}>
+                  <i className="bi bi-people-fill me-2"></i>Employees
+                </h4>
+                <small className="text-muted">
+                  Total: <strong>{totalCount}</strong> employees | 
+                  Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong>
                 </small>
               </div>
-              <div className="d-flex flex-column flex-md-row gap-2 align-items-stretch align-items-md-center w-100 w-md-auto">
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Search employees..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  style={{ maxWidth: '250px', borderRadius: '8px' }}
-                />
-                <Link to="/employees/add" className="btn px-4 shadow" style={{ background: '#3498db', color: 'white', borderRadius: '8px', border: 'none', whiteSpace: 'nowrap' }}>
-                  <i className="bi bi-plus-circle me-2"></i>
-                  Add Employee
+              <div className="d-flex gap-2">
+                <div className="input-group" style={{ width: '300px' }}>
+                  <span className="input-group-text" style={{ background: '#f8f9fa', border: '1px solid #dee2e6' }}>
+                    <i className="bi bi-search"></i>
+                  </span>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Search by name, email, code..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    style={{ border: '1px solid #dee2e6' }}
+                  />
+                </div>
+                <Link 
+                  to="/employees/add" 
+                  className="btn btn-primary px-4 shadow-sm d-flex align-items-center gap-2"
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  <i className="bi bi-plus-circle"></i>
+                  <span>Add Employee</span>
                 </Link>
               </div>
             </div>
@@ -220,12 +249,12 @@ export function EmployeeList() {
                     <tr>
                       <td colSpan={11} className="text-center">Loading...</td>
                     </tr>
-                  ) : filteredEmployees.length === 0 ? (
+                  ) : employees.length === 0 ? (
                     <tr>
                       <td colSpan={11} className="text-center">No employees found</td>
                     </tr>
                   ) : (
-                    filteredEmployees
+                    employees
                       .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                       .map((employee) => (
                       <tr key={employee.id}>
@@ -304,7 +333,7 @@ export function EmployeeList() {
                 </li>
               </ul>
               <div className="mt-2 text-muted small">
-                Page {currentPage} of {totalPages} (Total: {filteredEmployees.length} employees)
+                Page {currentPage} of {totalPages} (Total: {totalCount} employees)
               </div>
             </nav>
           </div>

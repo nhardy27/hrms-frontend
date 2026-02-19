@@ -195,8 +195,7 @@ export function SalaryManagement() {
         toast.error('Failed to fetch salary records');
       }
     } catch (error) {
-      console.error("Error fetching salaries:", error);
-      toast.error('Error loading salary records');
+            toast.error('Error loading salary records');
     }
   };
 
@@ -210,8 +209,7 @@ export function SalaryManagement() {
         setEmployees(emps);
       }
     } catch (error) {
-      console.error("Error fetching employees:", error);
-      toast.error("Failed to fetch employees");
+            toast.error("Failed to fetch employees");
     }
   };
 
@@ -224,8 +222,7 @@ export function SalaryManagement() {
         setYears(data.results);
       }
     } catch (error) {
-      console.error("Error fetching years:", error);
-      toast.error("Failed to fetch years");
+            toast.error("Failed to fetch years");
     }
   };
 
@@ -267,8 +264,7 @@ export function SalaryManagement() {
         }));
       }
     } catch (error) {
-      console.error("Error fetching attendance:", error);
-    }
+          }
   };
 
 
@@ -352,8 +348,7 @@ export function SalaryManagement() {
         toast.error("Failed to delete salary");
       }
     } catch (error) {
-      console.error("Error deleting salary:", error);
-      toast.error("Failed to delete salary");
+            toast.error("Failed to delete salary");
     }
   };
 
@@ -442,8 +437,7 @@ export function SalaryManagement() {
               toast.error("Salary created but failed to send email");
             }
           } catch (emailError) {
-            console.error("Error sending email:", emailError);
-            toast.error("Salary created but failed to send email");
+                        toast.error("Salary created but failed to send email");
           }
         }
         
@@ -480,8 +474,7 @@ export function SalaryManagement() {
         toast.error(errorMsg);
       }
     } catch (error) {
-      console.error("Error:", error);
-      toast.error("Failed to save salary: " + (error instanceof Error ? error.message : 'Unknown error'));
+            toast.error("Failed to save salary: " + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setLoading(false);
     }

@@ -55,12 +55,10 @@ export function SalarySlip() {
         }
       } else {
         const errorText = await response.text();
-        console.error('Error response:', errorText);
-        toast.error("Failed to fetch salary details");
+                toast.error("Failed to fetch salary details");
       }
     } catch (error) {
-      console.error("Error:", error);
-      toast.error("Error loading salary slip");
+            toast.error("Error loading salary slip");
     } finally {
       setLoading(false);
     }

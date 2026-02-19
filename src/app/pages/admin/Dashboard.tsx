@@ -61,8 +61,7 @@ export function AdminDashboard() {
       // If admin, fetch dashboard statistics
       fetchDashboardStats();
     } catch (error) {
-      console.error("Error parsing user data:", error);
-      navigate("/login");
+            navigate("/login");
     }
   }, [navigate]);
 
@@ -91,8 +90,7 @@ export function AdminDashboard() {
         toast.error("Failed to load dashboard data");
       }
     } catch (error) {
-      console.error("Admin dashboard error:", error);
-      toast.error("Failed to load dashboard data");
+            toast.error("Failed to load dashboard data");
     } finally {
       // Always set loading to false when done
       setLoading(false);

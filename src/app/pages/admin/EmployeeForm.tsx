@@ -37,7 +37,6 @@ export function EmployeeForm() {
   const [loading, setLoading] = useState(false);
   const [usernameError, setUsernameError] = useState('');
   const [phoneError, setPhoneError] = useState('');
-  const [checkingUsername, setCheckingUsername] = useState(false);
 
   const [formData, setFormData] = useState({
     emp_code: "",
@@ -75,7 +74,7 @@ export function EmployeeForm() {
         return data.access;
       }
     } catch (error) {
-      console.error('Error refreshing token:', error);
+      // Error refreshing token
     }
     return null;
   };
@@ -85,14 +84,12 @@ export function EmployeeForm() {
     const password = localStorage.getItem('password');
     
     if (!username || !password) {
-      console.error('No login credentials found. Please login first.');
-      // Redirect to login if no credentials
+      // No login credentials found
       navigate('/login');
       return null;
     }
 
     try {
-      console.log('Getting new token for user:', username);
       const response = await fetch(`${config.api.host}${config.api.token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -100,18 +97,17 @@ export function EmployeeForm() {
       });
       if (response.ok) {
         const data = await response.json();
-        console.log('New token received');
         localStorage.setItem('token', data.access);
         if (data.refresh) {
           localStorage.setItem('refreshToken', data.refresh);
         }
         return data.access;
       } else {
-        console.error('Failed to get token:', response.status);
+        // Failed to get token
         navigate('/login');
       }
     } catch (error) {
-      console.error('Error getting token:', error);
+      // Error getting token
       navigate('/login');
     }
     return null;
@@ -124,7 +120,6 @@ export function EmployeeForm() {
     if (!token) {
       token = await refreshToken() || await getToken();
       if (!token) {
-        console.error('Unable to get valid token');
         return new Response(JSON.stringify({error: 'Authentication failed'}), {status: 401});
       }
     }
@@ -139,18 +134,14 @@ export function EmployeeForm() {
     
     // If token is invalid, try to refresh and retry once
     if (response.status === 401) {
-      console.log('Token expired, attempting refresh...');
       localStorage.removeItem('token'); // Clear invalid token
       
       token = await refreshToken() || await getToken();
       if (token) {
-        console.log('Got new token, retrying request...');
         response = await fetch(url, {
           ...options,
           headers: { ...headers, 'Authorization': `Bearer ${token}` }
         });
-      } else {
-        console.error('Failed to refresh token');
       }
     }
     
@@ -216,7 +207,7 @@ export function EmployeeForm() {
         }
       }
     } catch (error) {
-      console.error('Error fetching departments:', error);
+      // Error fetching departments
     }
   };
 
@@ -246,14 +237,13 @@ export function EmployeeForm() {
         });
       }
     } catch (error) {
-      console.error('Error fetching employee:', error);
+      // Error fetching employee
     }
   };
 
   const checkUsernameExists = async (username: string) => {
     if (!username || (isEdit && username === formData.username)) return;
     
-    setCheckingUsername(true);
     try {
       const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.user}?username=${username}`);
       if (response.ok) {
@@ -264,9 +254,7 @@ export function EmployeeForm() {
         setUsernameError(existingUser ? 'Username already exists' : '');
       }
     } catch (error) {
-      console.error('Error checking username:', error);
-    } finally {
-      setCheckingUsername(false);
+      // Error checking username
     }
   };
 
@@ -293,7 +281,7 @@ export function EmployeeForm() {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -353,7 +341,6 @@ export function EmployeeForm() {
         }
       }
     } catch (error) {
-      console.error('Error saving employee:', error);
       toast.error('Error saving employee. Please try again.');
     } finally {
       setLoading(false);

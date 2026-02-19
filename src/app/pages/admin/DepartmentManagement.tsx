@@ -39,8 +39,7 @@ export function DepartmentPage() {
         return data.access;
       }
     } catch (error) {
-      console.error('Error refreshing token:', error);
-    }
+          }
     return null;
   };
 
@@ -49,8 +48,7 @@ export function DepartmentPage() {
     const password = localStorage.getItem('password');
     
     if (!username || !password) {
-      console.error('No login credentials found');
-      return null;
+            return null;
     }
 
     try {
@@ -68,8 +66,7 @@ export function DepartmentPage() {
         return data.access;
       }
     } catch (error) {
-      console.error('Error getting token:', error);
-    }
+          }
     return null;
   };
 
@@ -112,8 +109,7 @@ export function DepartmentPage() {
         setDepartments(data.results || []);
       }
     } catch (error) {
-      console.error('Error fetching departments:', error);
-    }
+          }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -150,8 +146,7 @@ export function DepartmentPage() {
       }
       resetForm();
     } catch (error) {
-      console.error('Error saving department:', error);
-      toast.error('Error saving department');
+            toast.error('Error saving department');
     } finally {
       setLoading(false);
     }
@@ -185,8 +180,7 @@ export function DepartmentPage() {
           toast.error('Failed to delete department');
         }
       } catch (error) {
-        console.error('Error deleting department:', error);
-        toast.error('Error deleting department');
+                toast.error('Error deleting department');
       }
     }
   };

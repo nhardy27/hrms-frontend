@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import config from "../../../config/global.json";
-import { makeAuthenticatedRequest, fetchAllPages } from '../../../utils/apiUtils';
+import { makeAuthenticatedRequest } from '../../../utils/apiUtils';
 import toast, { Toaster } from 'react-hot-toast';
 import { AdminLayout } from '../../components/AdminLayout';
 
@@ -18,20 +18,33 @@ interface LeaveRequest {
 export function LeaveManagement() {
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [currentPage]);
 
   const loadData = async () => {
+    setLoading(true);
     try {
-      const [leaves, allUsers, departments] = await Promise.all([
-        fetchAllPages(`${config.api.host}${config.api.leave}`),
-        fetchAllPages(`${config.api.host}${config.api.user}`),
-        fetchAllPages(`${config.api.host}${config.api.department}`)
+      const [leavesRes, usersRes, deptsRes] = await Promise.all([
+        makeAuthenticatedRequest(`${config.api.host}${config.api.leave}?page=${currentPage}`),
+        makeAuthenticatedRequest(`${config.api.host}${config.api.user}`),
+        makeAuthenticatedRequest(`${config.api.host}${config.api.department}`)
       ]);
       
-      // Map user names and department names to leaves and filter out admin users
+      const [leavesData, usersData, deptsData] = await Promise.all([
+        leavesRes.json(),
+        usersRes.json(),
+        deptsRes.json()
+      ]);
+      
+      const leaves = leavesData.results || [];
+      const allUsers = usersData.results || [];
+      const departments = deptsData.results || [];
+      
       const leavesWithNames = leaves
         .map((leave: LeaveRequest) => {
           const user = allUsers.find((u: any) => u.id === leave.user);
@@ -46,9 +59,10 @@ export function LeaveManagement() {
         .filter((leave: any) => leave.username !== 'admin');
       
       setLeaveRequests(leavesWithNames);
+      setTotalCount(leavesData.count || 0);
+      setTotalPages(Math.ceil((leavesData.count || 0) / 10));
     } catch (error) {
-      console.error('Error fetching data:', error);
-      toast.error('Failed to load leave requests');
+            toast.error('Failed to load leave requests');
     } finally {
       setLoading(false);
     }
@@ -68,8 +82,7 @@ export function LeaveManagement() {
         toast.error('Failed to update leave status');
       }
     } catch (error) {
-      console.error('Error updating leave:', error);
-      toast.error('Error updating leave status');
+            toast.error('Error updating leave status');
     }
   };
 
@@ -132,29 +145,26 @@ export function LeaveManagement() {
                         </td>
                         <td>
                           {(!leave.status || leave.status === 'PENDING') ? (
-                            <div className="btn-group">
+                            <div className="d-flex gap-1">
                               <button 
-                                className="btn btn-sm shadow-sm"
+                                className="btn btn-sm btn-success shadow-sm"
                                 onClick={() => updateLeaveStatus(leave.id, 'APPROVED')}
-                                style={{ background: '#28a745', color: 'white', border: 'none', borderRadius: '6px' }}
                               >
                                 <i className="bi bi-check-circle me-1"></i>Approve
                               </button>
                               <button 
-                                className="btn btn-sm shadow-sm ms-1"
+                                className="btn btn-sm btn-danger shadow-sm"
                                 onClick={() => updateLeaveStatus(leave.id, 'REJECTED')}
-                                style={{ background: '#dc3545', color: 'white', border: 'none', borderRadius: '6px' }}
                               >
                                 <i className="bi bi-x-circle me-1"></i>Reject
                               </button>
                             </div>
                           ) : (
-                            <div className="btn-group">
+                            <div className="d-flex gap-1 flex-wrap">
                               {leave.status !== 'APPROVED' && (
                                 <button 
                                   className="btn btn-sm btn-outline-success shadow-sm"
                                   onClick={() => updateLeaveStatus(leave.id, 'APPROVED')}
-                                  style={{ borderRadius: '6px' }}
                                 >
                                   <i className="bi bi-check-circle me-1"></i>Approve
                                 </button>
@@ -163,7 +173,6 @@ export function LeaveManagement() {
                                 <button 
                                   className="btn btn-sm btn-outline-danger shadow-sm"
                                   onClick={() => updateLeaveStatus(leave.id, 'REJECTED')}
-                                  style={{ borderRadius: '6px' }}
                                 >
                                   <i className="bi bi-x-circle me-1"></i>Reject
                                 </button>
@@ -172,7 +181,6 @@ export function LeaveManagement() {
                                 <button 
                                   className="btn btn-sm btn-outline-warning shadow-sm"
                                   onClick={() => updateLeaveStatus(leave.id, 'PENDING')}
-                                  style={{ borderRadius: '6px' }}
                                 >
                                   <i className="bi bi-arrow-counterclockwise me-1"></i>Reset
                                 </button>
@@ -185,6 +193,40 @@ export function LeaveManagement() {
                   </tbody>
                 </table>
               </div>
+            )}
+            {leaveRequests.length > 0 && (
+              <nav className="mt-3">
+                <ul className="pagination mb-0">
+                  <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                    <button 
+                      className="page-link" 
+                      onClick={() => setCurrentPage(prev => prev - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </button>
+                  </li>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <li key={page} className={`page-item ${currentPage === page ? 'active' : ''}`}>
+                      <button className="page-link" onClick={() => setCurrentPage(page)}>
+                        {page}
+                      </button>
+                    </li>
+                  ))}
+                  <li className={`page-item ${currentPage >= totalPages ? 'disabled' : ''}`}>
+                    <button 
+                      className="page-link" 
+                      onClick={() => setCurrentPage(prev => prev + 1)}
+                      disabled={currentPage >= totalPages}
+                    >
+                      Next
+                    </button>
+                  </li>
+                </ul>
+                <div className="mt-2 text-muted small">
+                  Page {currentPage} of {totalPages} (Total: {totalCount} leave requests)
+                </div>
+              </nav>
             )}
           </div>
         </div>
