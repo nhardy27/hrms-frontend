@@ -34,6 +34,7 @@ interface ManualTime {
 export function MarkAttendance() {
   const navigate = useNavigate();
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
   const [existingAttendance, setExistingAttendance] = useState<AttendanceData[]>([]);
   const [manualTimes, setManualTimes] = useState<Record<string, ManualTime>>({});
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
@@ -42,6 +43,7 @@ export function MarkAttendance() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     const initializeData = async () => {
@@ -68,10 +70,10 @@ export function MarkAttendance() {
   }, []);
 
   useEffect(() => {
-    if (employees.length > 0 || currentPage === 1) {
+    if (employees.length > 0 || allEmployees.length === 0) {
       fetchEmployeesAndAttendance();
     }
-  }, [selectedDate, currentPage]);
+  }, [selectedDate]);
 
   const getEmployeeAttendance = (employeeId: string): AttendanceData | null => {
     return existingAttendance.find(att => att.user.toString() === employeeId.toString()) || null;
@@ -80,16 +82,23 @@ export function MarkAttendance() {
   const fetchEmployeesAndAttendance = async () => {
     setDataLoading(true);
     try {
-      const url = `${config.api.host}${config.api.user}?page=${currentPage}`;
-      const response = await makeAuthenticatedRequest(url);
+      let allData: Employee[] = [];
+      let page = 1;
+      let hasMore = true;
       
-      if (response.ok) {
-        const data = await response.json();
-        const allEmployees = data.results || [];
+      while (hasMore) {
+        const url = `${config.api.host}${config.api.user}?page=${page}`;
+        const response = await makeAuthenticatedRequest(url);
         
-        const processedEmployees = allEmployees
-          .filter((emp: any) => emp.is_active && emp.username !== 'admin')
-          .map((emp: any) => ({
+        if (response.ok) {
+          const data = await response.json();
+          const pageEmployees = data.results || [];
+          
+          const regularEmployees = pageEmployees.filter((emp: any) => 
+            emp.is_active && emp.username !== 'admin' && !emp.is_superuser
+          );
+          
+          const processedEmployees = regularEmployees.map((emp: any) => ({
             id: emp.id.toString(),
             emp_code: `EMP${emp.id.toString().padStart(3, '0')}`,
             first_name: emp.first_name || emp.username,
@@ -98,11 +107,19 @@ export function MarkAttendance() {
             department_name: emp.department_name || 'N/A',
             is_active: emp.is_active
           }));
-        
-        setEmployees(processedEmployees);
-        setTotalCount(data.count || 0);
-        setTotalPages(Math.ceil((data.count || 0) / 10));
+          
+          allData = [...allData, ...processedEmployees];
+          hasMore = !!data.next;
+          page++;
+        } else {
+          hasMore = false;
+        }
       }
+      
+      setAllEmployees(allData);
+      setEmployees(allData);
+      setTotalCount(allData.length);
+      setTotalPages(Math.ceil(allData.length / itemsPerPage));
       
       const attendanceUrl = `${config.api.host}${config.api.attendance}?date=${selectedDate}`;
       const attResponse = await makeAuthenticatedRequest(attendanceUrl);
@@ -112,7 +129,7 @@ export function MarkAttendance() {
         setExistingAttendance(attData.results || []);
       }
     } catch (error) {
-            toast.error('Failed to load attendance data');
+      toast.error('Failed to load attendance data');
     } finally {
       setDataLoading(false);
     }
@@ -257,24 +274,44 @@ export function MarkAttendance() {
           <div className="card-body">
             <div className="row mb-3 g-3">
               <div className="col-12 col-md-4">
-                <div className="card border-0 shadow-sm" style={{ borderRadius: '12px', background: '#0e0e0e' }}>
-                  <div className="card-body text-center text-white">
+                <div className="card border-0" style={{ borderRadius: '12px', backgroundColor: '#f4f5f6' }}>
+                  <div className="card-body text-center">
+                    <i className="bi bi-people-fill text-primary" style={{ fontSize: '2rem', marginBottom: '0.5rem' }}></i>
                     <h4 className="fw-bold">{totalCount}</h4>
-                    <p className="mb-0">Total Employees</p>
+                    <p className="mb-0 text-muted">Total Employees</p>
                   </div>
                 </div>
               </div>
               <div className="col-12 col-md-4">
-                <div className="card border-0 shadow-sm" style={{ borderRadius: '12px', background: '#0e0e0e' }}>
-                  <div className="card-body text-center text-white">
-                    <h4 className="fw-bold">{employees.length}</h4>
-                    <p className="mb-0">On This Page</p>
+                <div className="card border-0" style={{ borderRadius: '12px', backgroundColor: '#f4f5f6' }}>
+                  <div className="card-body text-center">
+                    <i className="bi bi-x-circle-fill text-danger" style={{ fontSize: '2rem', marginBottom: '0.5rem' }}></i>
+                    <h4 className="fw-bold">
+                      {employees.filter(emp => {
+                        const empAttendance = getEmployeeAttendance(emp.id);
+                        const manualTime = manualTimes[emp.id];
+                        const checkInTime = manualTime?.check_in || empAttendance?.check_in;
+                        const checkOutTime = manualTime?.check_out || empAttendance?.check_out;
+                        
+                        if (empAttendance?.total_hours) {
+                          const [hours, minutes, seconds] = empAttendance.total_hours.split(':').map(Number);
+                          return (hours + minutes / 60 + seconds / 3600) < 7;
+                        } else if (checkInTime && checkOutTime) {
+                          const checkIn = new Date(`1970-01-01T${checkInTime}`);
+                          const checkOut = new Date(`1970-01-01T${checkOutTime}`);
+                          return ((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60)) < 7;
+                        }
+                        return true;
+                      }).length}
+                    </h4>
+                    <p className="mb-0 text-muted">Absent Today</p>
                   </div>
                 </div>
               </div>
               <div className="col-12 col-md-4">
-                <div className="card border-0 shadow-sm" style={{ borderRadius: '12px', background: '#0e0e0e' }}>
-                  <div className="card-body text-center text-white">
+                <div className="card border-0" style={{ borderRadius: '12px', backgroundColor: '#f4f5f6' }}>
+                  <div className="card-body text-center">
+                    <i className="bi bi-check-circle-fill text-success" style={{ fontSize: '2rem', marginBottom: '0.5rem' }}></i>
                     <h4 className="fw-bold">
                       {employees.filter(emp => {
                         const empAttendance = getEmployeeAttendance(emp.id);
@@ -293,7 +330,7 @@ export function MarkAttendance() {
                         return false;
                       }).length}
                     </h4>
-                    <p className="mb-0">Present Today</p>
+                    <p className="mb-0 text-muted">Present Today</p>
                   </div>
                 </div>
               </div>
@@ -326,7 +363,9 @@ export function MarkAttendance() {
                     </tr>
                   </thead>
                   <tbody>
-                    {employees.map(emp => {
+                    {employees
+                      .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                      .map(emp => {
                       const empAttendance = getEmployeeAttendance(emp.id);
                       let totalHours = 'N/A';
                       let calculatedHours = 0;
