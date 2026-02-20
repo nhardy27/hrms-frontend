@@ -7,7 +7,6 @@
     "path": "/api/v1",
     "refreshToken": "/auth/token/refresh/",
     "user": "/api/v1/user/",
-    "profile": "/api/v1/user/profile/",
     "department": "/api/v1/department/",
     "employee": "/api/v1/user/",  
     "attendance": "/api/v1/attendance/",
