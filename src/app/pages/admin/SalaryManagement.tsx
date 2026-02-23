@@ -22,6 +22,9 @@ interface Employee {
   bank_name?: string;
   bank_account_number?: string;
   ifsc_code?: string;
+  basic_salary?: number;
+  hra?: number;
+  allowance?: number;
 }
 
 // TypeScript interface for Year data
@@ -345,18 +348,22 @@ export function SalaryManagement() {
   };
 
   // Function to handle editing an existing salary record
-  const handleEdit = (salary: SalaryRecord) => {
+  const handleEdit = async (salary: SalaryRecord) => {
     // Set editing mode with salary ID
     setEditingId(salary.id);
+    
+    // Fetch latest salary data from user API
+    const employee = employees.find(emp => emp.id === salary.user?.id);
+    
     // Populate form with existing salary data
     setFormData({
       user: salary.user?.id.toString() || '',
       year: salary.year,
       month: salary.month,
       attendance: '',
-      basic_salary: salary.basic_salary,
-      hra: salary.hra,
-      allowance: salary.allowance,
+      basic_salary: employee?.basic_salary?.toString() || salary.basic_salary,
+      hra: employee?.hra?.toString() || salary.hra,
+      allowance: employee?.allowance?.toString() || salary.allowance,
       total_working_days: salary.total_working_days,
       present_days: salary.present_days,
       absent_days: salary.absent_days,
@@ -913,14 +920,16 @@ export function SalaryManagement() {
                   </thead>
                   <tbody>
                     {/* Map through salary records and display each row */}
-                    {salaryRecords.map(salary => (
+                    {salaryRecords.map(salary => {
+                      const employee = employees.find(emp => emp.id === salary.user?.id);
+                      return (
                       <tr key={salary.id}>
                         <td>{salary.user?.username || 'N/A'}</td>
                         {/* Display month name and year */}
                         <td>{MONTHS.find(m => m.value === salary.month)?.label} {years.find(y => y.id === salary.year)?.year}</td>
-                        <td>₹{salary.basic_salary}</td>
-                        <td>₹{salary.hra}</td>
-                        <td>₹{salary.allowance}</td>
+                        <td>₹{employee?.basic_salary || salary.basic_salary}</td>
+                        <td>₹{employee?.hra || salary.hra}</td>
+                        <td>₹{employee?.allowance || salary.allowance}</td>
                         <td>{salary.present_days}</td>
                         <td>{salary.half_days}</td>
                         <td>{salary.absent_days}</td>
@@ -957,7 +966,8 @@ export function SalaryManagement() {
                         </button>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

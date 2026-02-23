@@ -66,7 +66,7 @@ export function EmployeeSalarySlip() {
     return <div className="text-center p-5">Loading...</div>;
   }
 
-  const grossSalary = parseFloat(salary.basic_salary) + parseFloat(salary.hra) + parseFloat(salary.allowance);
+  const grossSalary = parseFloat(salary.userDetails?.basic_salary || salary.basic_salary) + parseFloat(salary.userDetails?.hra || salary.hra) + parseFloat(salary.userDetails?.allowance || salary.allowance);
   const totalDeduction = parseFloat(salary.pf_amount || 0) + parseFloat(salary.deduction || 0);
 
   return (
@@ -117,15 +117,15 @@ export function EmployeeSalarySlip() {
                   <tbody>
                     <tr>
                       <td style={{ fontWeight: 'bold' }}>Basic Salary</td>
-                      <td className="text-end">₹{parseFloat(salary.basic_salary).toFixed(2)}</td>
+                      <td className="text-end">₹{parseFloat(salary.userDetails?.basic_salary || salary.basic_salary).toFixed(2)}</td>
                     </tr>
                     <tr>
                       <td style={{ fontWeight: 'bold' }}>HRA</td>
-                      <td className="text-end">₹{parseFloat(salary.hra).toFixed(2)}</td>
+                      <td className="text-end">₹{parseFloat(salary.userDetails?.hra || salary.hra).toFixed(2)}</td>
                     </tr>
                     <tr>
                       <td style={{ fontWeight: 'bold' }}>Allowance</td>
-                      <td className="text-end">₹{parseFloat(salary.allowance).toFixed(2)}</td>
+                      <td className="text-end">₹{parseFloat(salary.userDetails?.allowance || salary.allowance).toFixed(2)}</td>
                     </tr>
                     <tr style={{ backgroundColor: '#f5f5f5', fontWeight: 'bold' }}>
                       <td style={{ fontWeight: 'bold' }}>Gross Salary</td>
