@@ -19,6 +19,7 @@ export function EmployeeForm() {
   const [usernameError, setUsernameError] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [debounceTimer, setDebounceTimer] = useState<number | null>(null);
+  const [employeeRoleId, setEmployeeRoleId] = useState<number | null>(null);
 
   const [formData, setFormData] = useState({
     emp_code: "",
@@ -31,7 +32,7 @@ export function EmployeeForm() {
     department: "",
     designation: "",
     date_of_joining: "",
-    is_staff: false,
+    is_staff: true,
     is_active: true,
     address: "",
     bank_name: "",
@@ -156,6 +157,7 @@ export function EmployeeForm() {
 
   useEffect(() => {
     fetchDepartments();
+    fetchEmployeeRole();
     
     const handleDepartmentChange = () => {
       fetchDepartments().then(() => {
@@ -174,6 +176,22 @@ export function EmployeeForm() {
       generateEmployeeCode();
     }
   }, [id]);
+
+  const fetchEmployeeRole = async () => {
+    try {
+      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.role}?name=employee`);
+      if (response.ok) {
+        const data = await response.json();
+        const roles = data.results || data || [];
+        const employeeRole = roles.find((role: any) => role.name === 'employee');
+        if (employeeRole) {
+          setEmployeeRoleId(employeeRole.id);
+        }
+      }
+    } catch (error) {
+      // Error fetching employee role
+    }
+  };
 
   const fetchDepartments = async () => {
     try {
@@ -311,10 +329,12 @@ export function EmployeeForm() {
     setLoading(true);
 
     try {
-      let submitData = { ...formData };
+      let submitData: any = { ...formData };
       if (!isEdit) {
         const empCode = `EMP${formData.first_name.substring(0, 3).toUpperCase()}${Date.now().toString().slice(-4)}`;
-        submitData = { ...formData, emp_code: empCode };
+        submitData = { ...formData, emp_code: empCode, role: employeeRoleId, groups: employeeRoleId ? [employeeRoleId] : [] };
+      } else {
+        submitData = { ...formData, groups: employeeRoleId ? [employeeRoleId] : [] };
       }
 
       const url = isEdit 
