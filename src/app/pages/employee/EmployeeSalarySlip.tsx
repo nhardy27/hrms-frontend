@@ -14,6 +14,7 @@ export function EmployeeSalarySlip() {
     fetchSalaryDetails();
   }, [id]);
 
+  // Fetch salary details with user and department info
   const fetchSalaryDetails = async () => {
     try {
       const url = `${config.api.host}${config.api.salary}${id}/`;

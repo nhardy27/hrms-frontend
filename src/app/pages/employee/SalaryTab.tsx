@@ -40,6 +40,7 @@ export function SalaryTab() {
     fetchSalaries();
   }, []);
 
+  // Fetch employee salary records and user data
   const fetchSalaries = async () => {
     try {
       const user = localStorage.getItem('user');
@@ -79,6 +80,7 @@ export function SalaryTab() {
     }
   };
 
+  // Download salary slip in new tab
   const handleDownload = (salaryId: string) => {
     window.open(`/employee-salary-slip/${salaryId}`, '_blank');
   };

@@ -17,6 +17,7 @@ export function SalarySlip() {
     fetchSalaryDetails();
   }, [id]);
 
+  // Fetch salary details and user information
   const fetchSalaryDetails = async () => {
     try {
       const url = `${config.api.host}${config.api.salary}${id}/`;
@@ -64,6 +65,7 @@ export function SalarySlip() {
     }
   };
 
+  // Print salary slip
   const handlePrint = () => {
     window.print();
   };
