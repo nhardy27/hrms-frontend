@@ -26,6 +26,9 @@ interface Employee {
   bank_name?: string;
   bank_account_number?: string;
   ifsc_code?: string;
+  basic_salary?: string;
+  hra?: string;
+  allowance?: string;
 }
 
 interface Department {
@@ -230,7 +233,7 @@ export function EmployeeList() {
         <div className="card border-0 shadow-lg" style={{ borderRadius: '15px' }}>
           <div className="card-body">
             <div className="table-responsive" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-              <table className="table table-hover align-middle" style={{ minWidth: '1400px' }}>
+              <table className="table table-hover align-middle" style={{ minWidth: '1800px' }}>
                 <thead>
                   <tr>
                     <th style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>ID</th>
@@ -238,6 +241,9 @@ export function EmployeeList() {
                     <th style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Name</th>
                     <th style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Email</th>
                     <th style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Department</th>
+                    <th style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Basic Salary</th>
+                    <th style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>HRA</th>
+                    <th style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Allowance</th>
                     <th style={{ verticalAlign: 'middle', minWidth: '150px', whiteSpace: 'nowrap' }}>Address</th>
                     <th style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Bank Name</th>
                     <th style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Account Number</th>
@@ -256,6 +262,9 @@ export function EmployeeList() {
                         <td style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>{`${employee.first_name} ${employee.last_name}`}</td>
                         <td style={{ verticalAlign: 'middle' }}>{employee.email}</td>
                         <td style={{ verticalAlign: 'middle' }}>{employee.department_name || 'N/A'}</td>
+                        <td style={{ verticalAlign: 'middle' }}>{employee.basic_salary ? `₹${employee.basic_salary}` : 'Not Set'}</td>
+                        <td style={{ verticalAlign: 'middle' }}>{employee.hra ? `₹${employee.hra}` : 'Not Set'}</td>
+                        <td style={{ verticalAlign: 'middle' }}>{employee.allowance ? `₹${employee.allowance}` : 'Not Set'}</td>
                         <td style={{ verticalAlign: 'middle', whiteSpace: 'pre-wrap', maxWidth: '200px' }}>
                           {employee.address ? (
                             <small style={{ fontSize: '0.85em', lineHeight: '1.4' }}>

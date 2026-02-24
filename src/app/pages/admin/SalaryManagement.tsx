@@ -22,6 +22,9 @@ interface Employee {
   bank_name?: string;
   bank_account_number?: string;
   ifsc_code?: string;
+  basic_salary?: number;
+  hra?: number;
+  allowance?: number;
 }
 
 // TypeScript interface for Year data
@@ -153,7 +156,13 @@ export function SalaryManagement() {
     
     // Load initial data
     fetchEmployees();
-    fetchYears();
+    fetchYears().then(() => {
+      // Set default year to 2026 after years are loaded
+      const year2026 = years.find(y => y.year === 2026);
+      if (year2026) {
+        setFormData(prev => ({ ...prev, year: year2026.id }));
+      }
+    });
     setTimeout(() => fetchSalaries(), 100); // Slight delay to ensure employees are loaded first
   }, []);
 
@@ -161,6 +170,7 @@ export function SalaryManagement() {
   useEffect(() => {
     if (formData.user && formData.year && formData.month && !editingId) {
       fetchAttendanceForMonth();
+      fetchEmployeeSalary();
     }
   }, [formData.user, formData.year, formData.month]);
 
@@ -202,12 +212,22 @@ export function SalaryManagement() {
   // Function to fetch all active employees (excluding admin)
   const fetchEmployees = async () => {
     try {
-      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.user}?is_active=true`);
-      if (response.ok) {
-        const data = await response.json();
-        const emps = data.results.filter((emp: any) => emp.username !== 'admin');
-        setEmployees(emps);
+      let allEmployees: Employee[] = [];
+      let nextUrl = `${config.api.host}${config.api.user}?is_active=true&page_size=100`;
+      
+      while (nextUrl) {
+        const response = await makeAuthenticatedRequest(nextUrl);
+        if (response.ok) {
+          const data = await response.json();
+          const emps = data.results.filter((emp: any) => emp.username !== 'admin');
+          allEmployees = [...allEmployees, ...emps];
+          nextUrl = data.next; // Get next page URL
+        } else {
+          break;
+        }
       }
+      
+      setEmployees(allEmployees);
     } catch (error) {
             toast.error("Failed to fetch employees");
     }
@@ -220,9 +240,33 @@ export function SalaryManagement() {
       if (response.ok) {
         const data = await response.json();
         setYears(data.results);
+        
+        // Set default year to 2026
+        const year2026 = data.results.find((y: Year) => y.year === 2026);
+        if (year2026 && !formData.year) {
+          setFormData(prev => ({ ...prev, year: year2026.id }));
+        }
       }
     } catch (error) {
             toast.error("Failed to fetch years");
+    }
+  };
+
+  // Function to fetch employee salary data from user API
+  const fetchEmployeeSalary = async () => {
+    try {
+      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.user}${formData.user}/`);
+      if (response.ok) {
+        const userData = await response.json();
+        setFormData(prev => ({
+          ...prev,
+          basic_salary: userData.basic_salary || '',
+          hra: userData.hra || '',
+          allowance: userData.allowance || ''
+        }));
+      }
+    } catch (error) {
+      // Error fetching salary
     }
   };
 
@@ -304,18 +348,22 @@ export function SalaryManagement() {
   };
 
   // Function to handle editing an existing salary record
-  const handleEdit = (salary: SalaryRecord) => {
+  const handleEdit = async (salary: SalaryRecord) => {
     // Set editing mode with salary ID
     setEditingId(salary.id);
+    
+    // Fetch latest salary data from user API
+    const employee = employees.find(emp => emp.id === salary.user?.id);
+    
     // Populate form with existing salary data
     setFormData({
       user: salary.user?.id.toString() || '',
       year: salary.year,
       month: salary.month,
       attendance: '',
-      basic_salary: salary.basic_salary,
-      hra: salary.hra,
-      allowance: salary.allowance,
+      basic_salary: employee?.basic_salary?.toString() || salary.basic_salary,
+      hra: employee?.hra?.toString() || salary.hra,
+      allowance: employee?.allowance?.toString() || salary.allowance,
       total_working_days: salary.total_working_days,
       present_days: salary.present_days,
       absent_days: salary.absent_days,
@@ -637,9 +685,8 @@ export function SalaryManagement() {
                           className="form-control"
                           placeholder="0.00"
                           value={formData.basic_salary}
-                          onChange={(e) => setFormData({ ...formData, basic_salary: e.target.value })}
-                          required
-                          style={{borderRadius: '0 8px 8px 0', padding: '10px', border: '1px solid #dee2e6', borderLeft: 'none', background: '#ffffff'}}
+                          readOnly
+                          style={{borderRadius: '0 8px 8px 0', padding: '10px', border: '1px solid #dee2e6', borderLeft: 'none', background: '#f8f9fa'}}
                         />
                       </div>
                     </div>
@@ -653,9 +700,8 @@ export function SalaryManagement() {
                           className="form-control"
                           placeholder="0.00"
                           value={formData.hra}
-                          onChange={(e) => setFormData({ ...formData, hra: e.target.value })}
-                          required
-                          style={{borderRadius: '0 8px 8px 0', padding: '10px', border: '1px solid #dee2e6', borderLeft: 'none', background: '#ffffff'}}
+                          readOnly
+                          style={{borderRadius: '0 8px 8px 0', padding: '10px', border: '1px solid #dee2e6', borderLeft: 'none', background: '#f8f9fa'}}
                         />
                       </div>
                     </div>
@@ -669,9 +715,8 @@ export function SalaryManagement() {
                           className="form-control"
                           placeholder="0.00"
                           value={formData.allowance}
-                          onChange={(e) => setFormData({ ...formData, allowance: e.target.value })}
-                          required
-                          style={{borderRadius: '0 8px 8px 0', padding: '10px', border: '1px solid #dee2e6', borderLeft: 'none', background: '#ffffff'}}
+                          readOnly
+                          style={{borderRadius: '0 8px 8px 0', padding: '10px', border: '1px solid #dee2e6', borderLeft: 'none', background: '#f8f9fa'}}
                         />
                       </div>
                     </div>
@@ -875,14 +920,16 @@ export function SalaryManagement() {
                   </thead>
                   <tbody>
                     {/* Map through salary records and display each row */}
-                    {salaryRecords.map(salary => (
+                    {salaryRecords.map(salary => {
+                      const employee = employees.find(emp => emp.id === salary.user?.id);
+                      return (
                       <tr key={salary.id}>
                         <td>{salary.user?.username || 'N/A'}</td>
                         {/* Display month name and year */}
                         <td>{MONTHS.find(m => m.value === salary.month)?.label} {years.find(y => y.id === salary.year)?.year}</td>
-                        <td>₹{salary.basic_salary}</td>
-                        <td>₹{salary.hra}</td>
-                        <td>₹{salary.allowance}</td>
+                        <td>₹{employee?.basic_salary || salary.basic_salary}</td>
+                        <td>₹{employee?.hra || salary.hra}</td>
+                        <td>₹{employee?.allowance || salary.allowance}</td>
                         <td>{salary.present_days}</td>
                         <td>{salary.half_days}</td>
                         <td>{salary.absent_days}</td>
@@ -919,7 +966,8 @@ export function SalaryManagement() {
                         </button>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

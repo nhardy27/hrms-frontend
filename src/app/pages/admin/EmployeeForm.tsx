@@ -10,25 +10,6 @@ interface Department {
   status: boolean;
 }
 
-interface Employee {
-  id: string;
-  emp_code: string;
-  username?: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-  department: string;
-  contact_no: string;
-  designation: string;
-  date_of_joining: string;
-  is_active: boolean;
-  is_staff: boolean;
-  address?: string;
-  bank_name?: string;
-  bank_account_number?: string;
-  ifsc_code?: string;
-}
-
 export function EmployeeForm() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -37,6 +18,8 @@ export function EmployeeForm() {
   const [loading, setLoading] = useState(false);
   const [usernameError, setUsernameError] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  const [debounceTimer, setDebounceTimer] = useState<number | null>(null);
+  const [employeeRoleId, setEmployeeRoleId] = useState<number | null>(null);
 
   const [formData, setFormData] = useState({
     emp_code: "",
@@ -49,13 +32,15 @@ export function EmployeeForm() {
     department: "",
     designation: "",
     date_of_joining: "",
-    is_staff: false,
+    is_staff: true,
     is_active: true,
-    groups: [1],
     address: "",
     bank_name: "",
     bank_account_number: "",
     ifsc_code: "",
+    basic_salary: "",
+    hra: "",
+    allowance: "",
   });
 
   const refreshToken = async () => {
@@ -172,6 +157,7 @@ export function EmployeeForm() {
 
   useEffect(() => {
     fetchDepartments();
+    fetchEmployeeRole();
     
     const handleDepartmentChange = () => {
       fetchDepartments().then(() => {
@@ -190,6 +176,22 @@ export function EmployeeForm() {
       generateEmployeeCode();
     }
   }, [id]);
+
+  const fetchEmployeeRole = async () => {
+    try {
+      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.role}?name=employee`);
+      if (response.ok) {
+        const data = await response.json();
+        const roles = data.results || data || [];
+        const employeeRole = roles.find((role: any) => role.name === 'employee');
+        if (employeeRole) {
+          setEmployeeRoleId(employeeRole.id);
+        }
+      }
+    } catch (error) {
+      // Error fetching employee role
+    }
+  };
 
   const fetchDepartments = async () => {
     try {
@@ -215,7 +217,8 @@ export function EmployeeForm() {
     try {
       const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.user}${id}/`);
       if (response.ok) {
-        const employee: Employee = await response.json();
+        const employee: any = await response.json();
+        
         setFormData({
           emp_code: employee.emp_code,
           username: employee.username || "",
@@ -229,11 +232,13 @@ export function EmployeeForm() {
           date_of_joining: employee.date_of_joining,
           is_staff: employee.is_staff || false,
           is_active: employee.is_active || true,
-          groups: [1],
           address: employee.address || "",
           bank_name: employee.bank_name || "",
           bank_account_number: employee.bank_account_number || "",
           ifsc_code: employee.ifsc_code || "",
+          basic_salary: employee.basic_salary || "",
+          hra: employee.hra || "",
+          allowance: employee.allowance || "",
         });
       }
     } catch (error) {
@@ -263,8 +268,13 @@ export function EmployeeForm() {
     setFormData(prev => ({ ...prev, username: value }));
     setUsernameError('');
     
-    if (value.trim()) {
-      setTimeout(() => checkUsernameExists(value), 800);
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+    
+    if (value.trim() && value.length >= 3) {
+      const timer = setTimeout(() => checkUsernameExists(value), 500);
+      setDebounceTimer(timer);
     }
   };
 
@@ -283,10 +293,24 @@ export function EmployeeForm() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
-    }));
+    
+    if (name === 'basic_salary') {
+      const basicSalary = parseFloat(value) || 0;
+      const hra = Math.round(basicSalary * 0.4); // 40% of basic salary
+      const allowance = Math.round(basicSalary * 0.15); // 15% of basic salary
+      
+      setFormData((prev) => ({
+        ...prev,
+        basic_salary: value,
+        hra: hra.toString(),
+        allowance: allowance.toString()
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+      }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -305,12 +329,12 @@ export function EmployeeForm() {
     setLoading(true);
 
     try {
-      // Generate employee code if not editing
-      let submitData = { ...formData };
+      let submitData: any = { ...formData };
       if (!isEdit) {
-        // Generate emp_code based on first name and timestamp
         const empCode = `EMP${formData.first_name.substring(0, 3).toUpperCase()}${Date.now().toString().slice(-4)}`;
-        submitData = { ...formData, emp_code: empCode };
+        submitData = { ...formData, emp_code: empCode, role: employeeRoleId, groups: employeeRoleId ? [employeeRoleId] : [] };
+      } else {
+        submitData = { ...formData, groups: employeeRoleId ? [employeeRoleId] : [] };
       }
 
       const url = isEdit 
@@ -325,7 +349,44 @@ export function EmployeeForm() {
       });
 
       if (response.ok) {
+        const employeeData = await response.json();
         toast.success(isEdit ? 'Employee updated successfully!' : 'Employee created successfully!');
+        
+        // Send offer letter email after creating employee
+        if (!isEdit && employeeData.id) {
+          try {
+            const deptName = departments.find(d => d.id === employeeData.department)?.name || '';
+            
+            const offerLetterData = {
+              candidate_contact: employeeData.contact_no,
+              designation: employeeData.designation,
+              department: deptName,
+              joining_date: employeeData.date_of_joining,
+              basic_salary: employeeData.basic_salary,
+              hra: employeeData.hra,
+              allowance: employeeData.allowance,
+              offer_date: new Date().toISOString().split('T')[0],
+              
+            };
+            
+            const emailResponse = await makeAuthenticatedRequest(
+              `${config.api.host}${config.api.user}${employeeData.id}/send_offer_letter/`,
+              {
+                method: 'POST',
+                body: JSON.stringify(offerLetterData)
+              }
+            );
+            
+            if (emailResponse.ok) {
+              toast.success("Offer letter sent to employee");
+            } else {
+              toast.error("Employee created but failed to send offer letter");
+            }
+          } catch (emailError) {
+            toast.error("Employee created but failed to send offer letter");
+          }
+        }
+        
         navigate("/employees");
       } else {
         const errorData = await response.json();
@@ -623,6 +684,54 @@ export function EmployeeForm() {
                   value={formData.ifsc_code}
                   onChange={handleChange}
                   placeholder="Enter IFSC code"
+                />
+              </div>
+
+              <div className="col-md-4">
+                <label htmlFor="basic_salary" className="form-label">
+                  Basic Salary <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="number"
+                  className="form-control"
+                  id="basic_salary"
+                  name="basic_salary"
+                  value={formData.basic_salary}
+                  onChange={handleChange}
+                  placeholder="Enter basic salary"
+                  required
+                />
+              </div>
+
+              <div className="col-md-4">
+                <label htmlFor="hra" className="form-label">
+                  HRA (40%)
+                </label>
+                <input
+                  type="number"
+                  className="form-control"
+                  id="hra"
+                  name="hra"
+                  value={formData.hra}
+                  readOnly
+                  style={{ backgroundColor: '#f8f9fa' }}
+                  placeholder="Auto-calculated"
+                />
+              </div>
+
+              <div className="col-md-4">
+                <label htmlFor="allowance" className="form-label">
+                  Allowance (15%)
+                </label>
+                <input
+                  type="number"
+                  className="form-control"
+                  id="allowance"
+                  name="allowance"
+                  value={formData.allowance}
+                  readOnly
+                  style={{ backgroundColor: '#f8f9fa' }}
+                  placeholder="Auto-calculated"
                 />
               </div>
             </div>

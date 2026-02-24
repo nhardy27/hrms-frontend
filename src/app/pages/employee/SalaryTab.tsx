@@ -19,24 +19,41 @@ interface SalaryRecord {
   pf_amount: string;
   net_salary: string;
   payment_status: string;
+  user?: any;
+}
+
+interface Employee {
+  id: number;
+  basic_salary?: number;
+  hra?: number;
+  allowance?: number;
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export function SalaryTab() {
   const [salaries, setSalaries] = useState<SalaryRecord[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchSalaries();
   }, []);
 
+  // Fetch employee salary records and user data
   const fetchSalaries = async () => {
     try {
       const user = localStorage.getItem('user');
       if (!user) return;
       
       const userData = JSON.parse(user);
+      
+      // Fetch employees
+      const empResponse = await makeAuthenticatedRequest(`${config.api.host}${config.api.user}`);
+      if (empResponse.ok) {
+        const empData = await empResponse.json();
+        setEmployees(empData.results || []);
+      }
       
       const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.salary}`);
       
@@ -63,6 +80,7 @@ export function SalaryTab() {
     }
   };
 
+  // Download salary slip in new tab
   const handleDownload = (salaryId: string) => {
     window.open(`/employee-salary-slip/${salaryId}`, '_blank');
   };
@@ -106,12 +124,14 @@ export function SalaryTab() {
                 </tr>
               </thead>
               <tbody>
-                {salaries.map((salary) => (
+                {salaries.map((salary) => {
+                  const employee = employees.find(emp => emp.id === (typeof salary.user === 'number' ? salary.user : salary.user?.id));
+                  return (
                   <tr key={salary.id}>
                     <td>{MONTHS[salary.month - 1]} {salary.year}</td>
-                    <td>₹{parseFloat(salary.basic_salary).toFixed(2)}</td>
-                    <td>₹{parseFloat(salary.hra).toFixed(2)}</td>
-                    <td>₹{parseFloat(salary.allowance).toFixed(2)}</td>
+                    <td>₹{parseFloat(employee?.basic_salary?.toString() || salary.basic_salary).toFixed(2)}</td>
+                    <td>₹{parseFloat(employee?.hra?.toString() || salary.hra).toFixed(2)}</td>
+                    <td>₹{parseFloat(employee?.allowance?.toString() || salary.allowance).toFixed(2)}</td>
                     <td>{salary.present_days}</td>
                     <td>{salary.absent_days}</td>
                     <td>₹{parseFloat(salary.pf_amount || '0').toFixed(2)}</td>
@@ -132,7 +152,8 @@ export function SalaryTab() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
