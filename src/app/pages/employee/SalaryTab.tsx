@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import toast from 'react-hot-toast';
 import config from "../../../config/global.json";
 import { makeAuthenticatedRequest } from '../../../utils/apiUtils';
+import { LoadingAnimation } from '../../components/LoadingAnimation';
 
 interface SalaryRecord {
   id: string;
@@ -36,31 +37,26 @@ export function SalaryTab() {
       if (!user) return;
       
       const userData = JSON.parse(user);
-      console.log('Current user ID:', userData.id);
       
       const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.salary}`);
       
       if (response.ok) {
         const data = await response.json();
-        console.log('All salary data:', data.results);
         
         const yearResponse = await makeAuthenticatedRequest(`${config.api.host}${config.api.year}`);
         const years = yearResponse.ok ? (await yearResponse.json()).results : [];
         
         const userSalaries = (data.results || []).filter((s: any) => {
           const salaryUserId = typeof s.user === 'number' ? s.user : s.user?.id;
-          console.log('Comparing salary user:', salaryUserId, 'with current user:', userData.id);
           return salaryUserId === userData.id;
         }).map((s: any) => ({
           ...s,
           year: typeof s.year === 'object' ? s.year.year : years.find((y: any) => y.id === s.year)?.year || s.year
         }));
         
-        console.log('Filtered user salaries:', userSalaries);
         setSalaries(userSalaries);
       }
     } catch (error) {
-      console.error("Error fetching salaries:", error);
       toast.error("Failed to load salary records");
     } finally {
       setLoading(false);
@@ -72,7 +68,7 @@ export function SalaryTab() {
   };
 
   if (loading) {
-    return <div className="text-center py-4"><div className="spinner-border"></div></div>;
+    return <LoadingAnimation />;
   }
 
   const totalPF = salaries.reduce((sum, salary) => sum + parseFloat(salary.pf_amount || '0'), 0);

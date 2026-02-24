@@ -74,7 +74,7 @@ export function EmployeeForm() {
         return data.access;
       }
     } catch (error) {
-      console.error('Error refreshing token:', error);
+      // Error refreshing token
     }
     return null;
   };
@@ -84,14 +84,12 @@ export function EmployeeForm() {
     const password = localStorage.getItem('password');
     
     if (!username || !password) {
-      console.error('No login credentials found. Please login first.');
-      // Redirect to login if no credentials
+      // No login credentials found
       navigate('/login');
       return null;
     }
 
     try {
-      console.log('Getting new token for user:', username);
       const response = await fetch(`${config.api.host}${config.api.token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -99,18 +97,17 @@ export function EmployeeForm() {
       });
       if (response.ok) {
         const data = await response.json();
-        console.log('New token received');
         localStorage.setItem('token', data.access);
         if (data.refresh) {
           localStorage.setItem('refreshToken', data.refresh);
         }
         return data.access;
       } else {
-        console.error('Failed to get token:', response.status);
+        // Failed to get token
         navigate('/login');
       }
     } catch (error) {
-      console.error('Error getting token:', error);
+      // Error getting token
       navigate('/login');
     }
     return null;
@@ -123,7 +120,6 @@ export function EmployeeForm() {
     if (!token) {
       token = await refreshToken() || await getToken();
       if (!token) {
-        console.error('Unable to get valid token');
         return new Response(JSON.stringify({error: 'Authentication failed'}), {status: 401});
       }
     }
@@ -138,18 +134,14 @@ export function EmployeeForm() {
     
     // If token is invalid, try to refresh and retry once
     if (response.status === 401) {
-      console.log('Token expired, attempting refresh...');
       localStorage.removeItem('token'); // Clear invalid token
       
       token = await refreshToken() || await getToken();
       if (token) {
-        console.log('Got new token, retrying request...');
         response = await fetch(url, {
           ...options,
           headers: { ...headers, 'Authorization': `Bearer ${token}` }
         });
-      } else {
-        console.error('Failed to refresh token');
       }
     }
     
@@ -158,32 +150,21 @@ export function EmployeeForm() {
 
   const generateEmployeeCode = async () => {
     try {
-      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.user}`);
+      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.user}?ordering=-id&limit=1`);
       if (response.ok) {
         const data = await response.json();
         const employees = data.results || [];
         
-        // Find highest employee code number
         let maxEmpNum = 0;
-        employees.forEach((emp: any) => {
-          if (emp.emp_code) {
-            const match = emp.emp_code.match(/EMP(\d+)/);
-            if (match) {
-              const num = parseInt(match[1]);
-              if (num > maxEmpNum) {
-                maxEmpNum = num;
-              }
-            }
-          }
-        });
+        if (employees.length > 0 && employees[0].emp_code) {
+          const match = employees[0].emp_code.match(/EMP(\d+)/);
+          if (match) maxEmpNum = parseInt(match[1]);
+        }
         
-        // Generate next employee code
         const nextEmpCode = `EMP${String(maxEmpNum + 1).padStart(3, '0')}`;
         setFormData(prev => ({ ...prev, emp_code: nextEmpCode }));
       }
     } catch (error) {
-      console.error('Error generating employee code:', error);
-      // Fallback to timestamp-based code
       const fallbackCode = `EMP${String(Date.now()).slice(-3)}`;
       setFormData(prev => ({ ...prev, emp_code: fallbackCode }));
     }
@@ -191,6 +172,18 @@ export function EmployeeForm() {
 
   useEffect(() => {
     fetchDepartments();
+    
+    const handleDepartmentChange = () => {
+      fetchDepartments().then(() => {
+        if (isEdit) fetchEmployee();
+      });
+    };
+    
+    window.addEventListener('departmentChanged', handleDepartmentChange);
+    return () => window.removeEventListener('departmentChanged', handleDepartmentChange);
+  }, []);
+
+  useEffect(() => {
     if (isEdit) {
       fetchEmployee();
     } else {
@@ -200,16 +193,21 @@ export function EmployeeForm() {
 
   const fetchDepartments = async () => {
     try {
-      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.department}`);
+      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.department}?status=true`);
       if (response.ok) {
         const data = await response.json();
-        console.log('Departments data:', data); // Debug log
-        setDepartments(data.results || data || []);
-      } else {
-        console.error('Failed to fetch departments:', response.status);
+        const activeDepts = data.results || data || [];
+        setDepartments(activeDepts);
+        
+        if (isEdit && formData.department) {
+          const deptExists = activeDepts.find((d: Department) => d.id === formData.department);
+          if (!deptExists && formData.department) {
+            setFormData(prev => ({ ...prev, department: '' }));
+          }
+        }
       }
     } catch (error) {
-      console.error('Error fetching departments:', error);
+      // Error fetching departments
     }
   };
 
@@ -239,7 +237,7 @@ export function EmployeeForm() {
         });
       }
     } catch (error) {
-      console.error('Error fetching employee:', error);
+      // Error fetching employee
     }
   };
 
@@ -247,20 +245,16 @@ export function EmployeeForm() {
     if (!username || (isEdit && username === formData.username)) return;
     
     try {
-      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.user}`);
+      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.user}?username=${username}`);
       if (response.ok) {
         const data = await response.json();
         const users = data.results || [];
         const existingUser = users.find((user: any) => user.username === username && (!isEdit || user.id !== id));
         
-        if (existingUser) {
-          setUsernameError('Username already exists');
-        } else {
-          setUsernameError('');
-        }
+        setUsernameError(existingUser ? 'Username already exists' : '');
       }
     } catch (error) {
-      console.error('Error checking username:', error);
+      // Error checking username
     }
   };
 
@@ -270,7 +264,7 @@ export function EmployeeForm() {
     setUsernameError('');
     
     if (value.trim()) {
-      setTimeout(() => checkUsernameExists(value), 500);
+      setTimeout(() => checkUsernameExists(value), 800);
     }
   };
 
@@ -287,7 +281,7 @@ export function EmployeeForm() {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -332,16 +326,10 @@ export function EmployeeForm() {
 
       if (response.ok) {
         toast.success(isEdit ? 'Employee updated successfully!' : 'Employee created successfully!');
-        // Force refresh of employee list by clearing any cached data
-        localStorage.removeItem('employeeListCache');
         navigate("/employees");
       } else {
         const errorData = await response.json();
-        console.error('Error saving employee:', errorData);
-        console.error('Response status:', response.status);
-        console.error('Submit data:', submitData);
         
-        // Show specific error messages if available
         if (errorData.username) {
           toast.error(`Username error: ${errorData.username[0]}`);
         } else if (errorData.email) {
@@ -353,7 +341,6 @@ export function EmployeeForm() {
         }
       }
     } catch (error) {
-      console.error('Error saving employee:', error);
       toast.error('Error saving employee. Please try again.');
     } finally {
       setLoading(false);

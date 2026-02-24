@@ -11,6 +11,7 @@ export function AdminLayout({ children, title = 'Admin Dashboard' }: AdminLayout
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const menuItems = [
     { path: '/admin-dashboard', icon: 'bi-speedometer2', label: 'Dashboard' },
@@ -28,31 +29,51 @@ export function AdminLayout({ children, title = 'Admin Dashboard' }: AdminLayout
 
   return (
     <div className="min-vh-100 d-flex" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>
+      {/* Mobile Overlay */}
+      {mobileMenuOpen && (
+        <div 
+          className="d-md-none position-fixed w-100 h-100" 
+          style={{ background: 'rgba(0,0,0,0.5)', zIndex: 999, top: 0, left: 0 }}
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+      
       {/* Sidebar */}
-      <div className={`${sidebarCollapsed ? 'collapsed-sidebar' : 'sidebar'}`} style={{
-        width: sidebarCollapsed ? '80px' : '260px',
-        transition: 'width 0.3s',
-        position: 'fixed',
-        height: '100vh',
-        overflowY: 'auto',
-        zIndex: 1000,
-        background: '#ffffff',
-        borderRight: '1px solid #e9ecef'
-      }}>
+      <div 
+        className={`${mobileMenuOpen ? 'd-block' : 'd-none'} d-md-block`} 
+        style={{
+          width: sidebarCollapsed ? '80px' : '260px',
+          transition: 'all 0.3s',
+          position: 'fixed',
+          height: '100vh',
+          overflowY: 'auto',
+          zIndex: 1000,
+          background: '#ffffff',
+          borderRight: '1px solid #e9ecef',
+          left: 0,
+          top: 0
+        }}
+      >
         <div className="p-3 d-flex justify-content-between align-items-center" style={{ borderBottom: '1px solid #e9ecef' }}>
           {!sidebarCollapsed && (
             <div className="d-flex align-items-center gap-2">
               <img src="/Logo.png" alt="HR System" style={{ height: '40px', objectFit: 'contain' }} />
-              <h5 className="mb-0" style={{ color: '#2c3e50' }}>HR System</h5>
+              <h5 className="mb-0 d-none d-md-block" style={{ color: '#2c3e50' }}>HR System</h5>
             </div>
           )}
           <button 
-            className="btn btn-sm btn-outline-dark" 
+            className="btn btn-sm btn-outline-dark d-none d-md-block" 
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             title={sidebarCollapsed ? 'Expand' : 'Collapse'}
             style={{ marginLeft: sidebarCollapsed ? 'auto' : '0', marginRight: sidebarCollapsed ? 'auto' : '0' }}
           >
             <i className="bi bi-layout-sidebar-inset"></i>
+          </button>
+          <button 
+            className="btn btn-sm btn-outline-dark d-md-none ms-auto" 
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <i className="bi bi-x-lg"></i>
           </button>
         </div>
         
@@ -61,7 +82,8 @@ export function AdminLayout({ children, title = 'Admin Dashboard' }: AdminLayout
             <Link
               key={item.path}
               to={item.path}
-              className={`nav-link text-dark rounded mb-2 d-flex align-items-center ${location.pathname === item.path ? '' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
+              className={`nav-link text-dark rounded mb-2 d-flex align-items-center`}
               style={{
                 padding: '12px 16px',
                 transition: 'all 0.2s',
@@ -103,17 +125,39 @@ export function AdminLayout({ children, title = 'Admin Dashboard' }: AdminLayout
       </div>
 
       {/* Main Content */}
-      <div className="flex-grow-1" style={{ marginLeft: sidebarCollapsed ? '80px' : '260px', transition: 'margin-left 0.3s' }}>
+      <div 
+        className="flex-grow-1" 
+        style={{ 
+          marginLeft: window.innerWidth >= 768 ? (sidebarCollapsed ? '80px' : '260px') : '0',
+          transition: 'margin-left 0.3s',
+          width: '100%',
+          maxWidth: '100vw',
+          overflowX: 'hidden'
+        }}
+      >
         <nav className="navbar navbar-expand-lg shadow-sm" style={{ background: '#ffffff', borderBottom: '1px solid #e9ecef' }}>
           <div className="container-fluid">
+            <button 
+              className="btn btn-link d-md-none me-2" 
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              style={{ color: '#2c3e50', textDecoration: 'none' }}
+            >
+              <i className="bi bi-list fs-4"></i>
+            </button>
             <span className="navbar-brand fw-bold" style={{ color: '#2c3e50' }}>{title}</span>
             <div className="navbar-nav ms-auto">
-              <span className="nav-link" style={{ color: '#2c3e50' }}><i className="bi bi-person-circle me-2"></i>Admin</span>
+              <button 
+                className="nav-link btn btn-link" 
+                onClick={handleLogout}
+                style={{ color: '#2c3e50', textDecoration: 'none', cursor: 'pointer', border: 'none', background: 'transparent' }}
+              >
+                <i className="bi bi-person-circle me-2"></i>Admin
+              </button>
             </div>
           </div>
         </nav>
         
-        <div className="content-wrapper">
+        <div className="content-wrapper" style={{ maxWidth: '100%', overflowX: 'hidden' }}>
           {children}
         </div>
       </div>

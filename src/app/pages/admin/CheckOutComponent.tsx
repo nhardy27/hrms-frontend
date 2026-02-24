@@ -39,16 +39,14 @@ export function CheckOutComponent({ attendanceId, employeeName, onSuccess, disab
         onSuccess();
       } else {
         const errorData = await response.text();
-        console.error('Check-out failed:', errorData);
-        if (errorData.includes('already') || errorData.includes('not found')) {
+                if (errorData.includes('already') || errorData.includes('not found')) {
           toast.error(`${employeeName} cannot check out - either not checked in or already checked out!`);
         } else {
           toast.error('Failed to check out');
         }
       }
     } catch (error) {
-      console.error('Error checking out:', error);
-      toast.error('Error checking out');
+            toast.error('Error checking out');
     } finally {
       setLoading(false);
     }

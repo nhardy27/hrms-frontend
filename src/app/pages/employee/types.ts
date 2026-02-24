@@ -8,6 +8,8 @@ export interface Employee {
   department?: string;
   department_name?: string;
   designation?: string;
+  contact_no?: string;
+  date_of_joining?: string;
 }
 
 export interface Attendance {

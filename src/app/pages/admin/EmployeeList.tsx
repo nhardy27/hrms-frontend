@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import toast, { Toaster } from 'react-hot-toast';
 import config from '../../../config/global.json';
-import { fetchAllPages, makeAuthenticatedRequest } from '../../../utils/apiUtils';
+import { makeAuthenticatedRequest } from '../../../utils/apiUtils';
 import { AdminLayout } from '../../components/AdminLayout';
+import { LoadingAnimation } from '../../components/LoadingAnimation';
 
 interface Employee {
   id: string;
@@ -35,10 +36,11 @@ interface Department {
 
 export function EmployeeList() {
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
+  const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const itemsPerPage = 10;
@@ -49,42 +51,35 @@ export function EmployeeList() {
     };
     initializeData();
     
-    // Listen for focus events to refresh data when returning from other pages
-    const handleFocus = () => {
-      fetchEmployees();
+    const handleFocus = async () => {
+      await fetchDepartments();
+      await fetchEmployees();
+    };
+    
+    const handleDepartmentChange = async () => {
+      await fetchDepartments();
+      await fetchEmployees();
     };
     
     window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
+    window.addEventListener('departmentChanged', handleDepartmentChange);
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('departmentChanged', handleDepartmentChange);
+    };
   }, []);
 
   useEffect(() => {
-    if (departments.length > 0) {
+    if (departments.length > 0 && allEmployees.length === 0) {
       fetchEmployees();
     }
-  }, [currentPage, departments]);
+  }, [departments]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchTerm) {
-        const filtered = employees.filter(emp => 
-          emp.emp_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          emp.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          emp.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          emp.department_name?.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-        setFilteredEmployees(filtered);
-        setTotalPages(Math.ceil(filtered.length / itemsPerPage));
-        setCurrentPage(1);
-      } else {
-        setFilteredEmployees(employees);
-        setTotalPages(Math.ceil(employees.length / itemsPerPage));
-      }
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [searchTerm, employees]);
+    setCurrentPage(1);
+    filterEmployees();
+  }, [searchTerm, allEmployees]);
 
   const fetchDepartments = async () => {
     try {
@@ -96,42 +91,74 @@ export function EmployeeList() {
         setDepartments(data.results || []);
       }
     } catch (error) {
-      console.error('Error fetching departments:', error);
+          }
+  };
+
+  const filterEmployees = () => {
+    let filtered = allEmployees;
+    
+    if (searchTerm) {
+      filtered = allEmployees.filter(emp => 
+        emp.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.emp_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.department_name?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
     }
+    
+    setEmployees(filtered);
+    setTotalCount(filtered.length);
+    setTotalPages(Math.ceil(filtered.length / itemsPerPage));
   };
 
   const fetchEmployees = async () => {
     setLoading(true);
     try {
-      console.log('Fetching all employees...');
-      const allEmployees = await fetchAllPages(`${config.api.host}${config.api.user}`);
+      let allData: Employee[] = [];
+      let page = 1;
+      let hasMore = true;
       
-      console.log('All employees from all pages:', allEmployees.length);
+      while (hasMore) {
+        const url = `${config.api.host}${config.api.user}?page=${page}`;
+        const response = await makeAuthenticatedRequest(url);
+        
+        if (response.ok) {
+          const data = await response.json();
+          const pageEmployees = data.results || [];
+          
+          const regularEmployees = pageEmployees.filter((emp: Employee) => 
+            !emp.is_superuser && emp.username !== 'admin'
+          );
+          
+          const employeesWithDepartments = regularEmployees.map((emp: Employee) => {
+            if (emp.department) {
+              const department = departments.find(dept => dept.id.toString() === emp.department.toString());
+              return {
+                ...emp,
+                department_name: department ? department.name : 'N/A'
+              };
+            }
+            return {
+              ...emp,
+              department_name: 'N/A'
+            };
+          });
+          
+          allData = [...allData, ...employeesWithDepartments];
+          hasMore = !!data.next;
+          page++;
+        } else {
+          hasMore = false;
+        }
+      }
       
-      // Filter out superusers and admin users
-      const regularEmployees = allEmployees.filter((emp: Employee) => 
-        !emp.is_superuser && emp.username !== 'admin'
-      );
-      
-      // Map department names to employees
-      const employeesWithDepartments = regularEmployees.map((emp: Employee) => {
-        const department = departments.find(dept => dept.id.toString() === emp.department.toString());
-        return {
-          ...emp,
-          department_name: department ? department.name : 'N/A'
-        };
-      });
-      
-      // Sort by ID in descending order (latest first)
-      employeesWithDepartments.sort((a, b) => parseInt(b.id) - parseInt(a.id));
-      
-      console.log('Final employees with departments:', employeesWithDepartments);
-      setEmployees(employeesWithDepartments);
-      setFilteredEmployees(employeesWithDepartments);
-      setTotalPages(Math.ceil(employeesWithDepartments.length / itemsPerPage));
+      setAllEmployees(allData);
+      setEmployees(allData);
+      setTotalCount(allData.length);
+      setTotalPages(Math.ceil(allData.length / itemsPerPage));
     } catch (error) {
-      console.error('Error fetching employees:', error);
-      toast.error('Error loading employees');
+            toast.error('Error loading employees');
     } finally {
       setLoading(false);
     }
@@ -151,38 +178,49 @@ export function EmployeeList() {
           toast.error('Failed to delete employee');
         }
       } catch (error) {
-        console.error('Error deleting employee:', error);
-        toast.error('Error deleting employee');
+                toast.error('Error deleting employee');
       }
     }
   };
 
   return (
     <AdminLayout title="Employee Management">
+      {loading && <LoadingAnimation />}
       <Toaster position="bottom-center" />
       <div className="container-fluid p-4">
         <div className="card border-0 shadow-lg mb-4" style={{ borderRadius: '15px', background: '#ffffff' }}>
-          <div className="card-body p-3">
-            <div className="d-flex justify-content-between align-items-center">
+          <div className="card-body p-4">
+            <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
               <div>
-                <h4 className="mb-1" style={{ color: '#2c3e50' }}><i className="bi bi-people-fill me-2"></i>Employees</h4>
-                <small className="opacity-75" style={{ color: '#7f8c8d' }}>
-                  Total: {employees.length} employees | 
-                  Showing: {Math.min((currentPage - 1) * itemsPerPage + 1, filteredEmployees.length)}-{Math.min(currentPage * itemsPerPage, filteredEmployees.length)} of {filteredEmployees.length}
+                <h4 className="mb-1" style={{ color: '#2c3e50' }}>
+                  <i className="bi bi-people-fill me-2"></i>Employees
+                </h4>
+                <small className="text-muted">
+                  Total: <strong>{totalCount}</strong> employees | 
+                  Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong>
                 </small>
               </div>
               <div className="d-flex gap-2">
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Search employees..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  style={{ width: '250px', borderRadius: '8px' }}
-                />
-                <Link to="/employees/add" className="btn px-4 shadow" style={{ background: '#3498db', color: 'white', borderRadius: '8px', border: 'none' }}>
-                  <i className="bi bi-plus-circle me-2"></i>
-                  Add Employee
+                <div className="input-group" style={{ width: '300px' }}>
+                  <span className="input-group-text" style={{ background: '#f8f9fa', border: '1px solid #dee2e6' }}>
+                    <i className="bi bi-search"></i>
+                  </span>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Search by name, email, code..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    style={{ border: '1px solid #dee2e6' }}
+                  />
+                </div>
+                <Link 
+                  to="/employees/add" 
+                  className="btn btn-primary px-4 shadow-sm d-flex align-items-center gap-2"
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  <i className="bi bi-plus-circle"></i>
+                  <span>Add Employee</span>
                 </Link>
               </div>
             </div>
@@ -191,8 +229,8 @@ export function EmployeeList() {
 
         <div className="card border-0 shadow-lg" style={{ borderRadius: '15px' }}>
           <div className="card-body">
-            <div className="table-responsive">
-              <table className="table table-hover align-middle">
+            <div className="table-responsive" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <table className="table table-hover align-middle" style={{ minWidth: '1400px' }}>
                 <thead>
                   <tr>
                     <th style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>ID</th>
@@ -209,18 +247,9 @@ export function EmployeeList() {
                   </tr>
                 </thead>
                 <tbody>
-                  {loading ? (
-                    <tr>
-                      <td colSpan={11} className="text-center">Loading...</td>
-                    </tr>
-                  ) : filteredEmployees.length === 0 ? (
-                    <tr>
-                      <td colSpan={11} className="text-center">No employees found</td>
-                    </tr>
-                  ) : (
-                    filteredEmployees
-                      .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-                      .map((employee) => (
+                  {employees
+                    .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                    .map((employee) => (
                       <tr key={employee.id}>
                         <td style={{ verticalAlign: 'middle' }}><strong>{employee.id}</strong></td>
                         <td style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>{employee.emp_code || `EMP${employee.id.toString().padStart(3, '0')}`}</td>
@@ -261,8 +290,7 @@ export function EmployeeList() {
                           </div>
                         </td>
                       </tr>
-                    ))
-                  )}
+                    ))}
                 </tbody>
               </table>
             </div>
@@ -297,7 +325,7 @@ export function EmployeeList() {
                 </li>
               </ul>
               <div className="mt-2 text-muted small">
-                Page {currentPage} of {totalPages} (Total: {filteredEmployees.length} employees)
+                Page {currentPage} of {totalPages} (Total: {totalCount} employees)
               </div>
             </nav>
           </div>
