@@ -22,6 +22,9 @@ interface Employee {
   bank_name?: string;
   bank_account_number?: string;
   ifsc_code?: string;
+  basic_salary?: number;
+  hra?: number;
+  allowance?: number;
 }
 
 // TypeScript interface for Year data
@@ -153,7 +156,13 @@ export function SalaryManagement() {
     
     // Load initial data
     fetchEmployees();
-    fetchYears();
+    fetchYears().then(() => {
+      // Set default year to 2026 after years are loaded
+      const year2026 = years.find(y => y.year === 2026);
+      if (year2026) {
+        setFormData(prev => ({ ...prev, year: year2026.id }));
+      }
+    });
     setTimeout(() => fetchSalaries(), 100); // Slight delay to ensure employees are loaded first
   }, []);
 
@@ -161,6 +170,7 @@ export function SalaryManagement() {
   useEffect(() => {
     if (formData.user && formData.year && formData.month && !editingId) {
       fetchAttendanceForMonth();
+      fetchEmployeeSalary();
     }
   }, [formData.user, formData.year, formData.month]);
 
@@ -172,13 +182,9 @@ export function SalaryManagement() {
   // Function to fetch all salary records from API
   const fetchSalaries = async () => {
     try {
-      console.log('Fetching salaries from:', `${config.api.host}${config.api.salary}`);
       const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.salary}`);
-      console.log('Salary response status:', response.status);
       if (response.ok) {
         const data = await response.json();
-        console.log('Salary data:', data);
-        // Map records and populate user details
         const records = (data.results || []).map((record: any) => {
           if (typeof record.user === 'number') {
             const emp = employees.find(e => e.id === record.user);
@@ -189,7 +195,6 @@ export function SalaryManagement() {
           }
           return record;
         }).sort((a: SalaryRecord, b: SalaryRecord) => {
-          // Sort by year (descending) then by month (descending)
           const yearA = years.find(y => y.id === a.year)?.year || 0;
           const yearB = years.find(y => y.id === b.year)?.year || 0;
           if (yearB !== yearA) return yearB - yearA;
@@ -197,29 +202,34 @@ export function SalaryManagement() {
         });
         setSalaryRecords(records);
       } else {
-        console.error('Failed to fetch salaries, status:', response.status);
-        toast.error('Failed to fetch salary records. Please check backend.');
+        toast.error('Failed to fetch salary records');
       }
     } catch (error) {
-      console.error("Error fetching salaries:", error);
-      toast.error('Error loading salary records');
+            toast.error('Error loading salary records');
     }
   };
 
   // Function to fetch all active employees (excluding admin)
   const fetchEmployees = async () => {
     try {
-      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.user}`);
-      if (response.ok) {
-        const data = await response.json();
-        // Filter only active employees, exclude admin user
-        const emps = data.results.filter((emp: any) => emp.is_active && emp.username !== 'admin');
-        console.log('Fetched employees with bank info:', emps);
-        setEmployees(emps);
+      let allEmployees: Employee[] = [];
+      let nextUrl = `${config.api.host}${config.api.user}?is_active=true&page_size=100`;
+      
+      while (nextUrl) {
+        const response = await makeAuthenticatedRequest(nextUrl);
+        if (response.ok) {
+          const data = await response.json();
+          const emps = data.results.filter((emp: any) => emp.username !== 'admin');
+          allEmployees = [...allEmployees, ...emps];
+          nextUrl = data.next; // Get next page URL
+        } else {
+          break;
+        }
       }
+      
+      setEmployees(allEmployees);
     } catch (error) {
-      console.error("Error fetching employees:", error);
-      toast.error("Failed to fetch employees");
+            toast.error("Failed to fetch employees");
     }
   };
 
@@ -230,10 +240,33 @@ export function SalaryManagement() {
       if (response.ok) {
         const data = await response.json();
         setYears(data.results);
+        
+        // Set default year to 2026
+        const year2026 = data.results.find((y: Year) => y.year === 2026);
+        if (year2026 && !formData.year) {
+          setFormData(prev => ({ ...prev, year: year2026.id }));
+        }
       }
     } catch (error) {
-      console.error("Error fetching years:", error);
-      toast.error("Failed to fetch years");
+            toast.error("Failed to fetch years");
+    }
+  };
+
+  // Function to fetch employee salary data from user API
+  const fetchEmployeeSalary = async () => {
+    try {
+      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.user}${formData.user}/`);
+      if (response.ok) {
+        const userData = await response.json();
+        setFormData(prev => ({
+          ...prev,
+          basic_salary: userData.basic_salary || '',
+          hra: userData.hra || '',
+          allowance: userData.allowance || ''
+        }));
+      }
+    } catch (error) {
+      // Error fetching salary
     }
   };
 
@@ -244,22 +277,14 @@ export function SalaryManagement() {
       const selectedYear = years.find(y => y.id === formData.year)?.year;
       const selectedMonth = MONTHS.find(m => m.value === formData.month)?.label.toLowerCase();
 
-      if (!selectedEmployee?.emp_code || !selectedYear || !selectedMonth) {
-        console.log('Missing required data for attendance search');
-        return;
-      }
+      if (!selectedEmployee?.emp_code || !selectedYear || !selectedMonth) return;
 
       const searchUrl = `${config.api.host}${config.api.attendance}?emp_code=${selectedEmployee.emp_code}&year=${selectedYear}&month=${selectedMonth}`;
-      console.log('Fetching attendance from:', searchUrl);
-
       const response = await makeAuthenticatedRequest(searchUrl);
-      console.log('Attendance response status:', response.status);
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Attendance data received:', data);
         const monthRecords = data.results || data || [];
-        console.log('Month records:', monthRecords);
 
         let presentDays = 0;
         let halfDays = 0;
@@ -273,7 +298,6 @@ export function SalaryManagement() {
         });
 
         const absentDays = formData.total_working_days - presentDays - halfDays;
-        console.log('Calculated - Present:', presentDays, 'Half:', halfDays, 'Absent:', absentDays);
 
         setFormData(prev => ({
           ...prev,
@@ -282,13 +306,9 @@ export function SalaryManagement() {
           absent_days: absentDays,
           attendance: monthRecords[0]?.id || ''
         }));
-      } else {
-        const errorData = await response.text();
-        console.error('Attendance fetch error:', errorData);
       }
     } catch (error) {
-      console.error("Error fetching attendance:", error);
-    }
+          }
   };
 
 
@@ -328,18 +348,22 @@ export function SalaryManagement() {
   };
 
   // Function to handle editing an existing salary record
-  const handleEdit = (salary: SalaryRecord) => {
+  const handleEdit = async (salary: SalaryRecord) => {
     // Set editing mode with salary ID
     setEditingId(salary.id);
+    
+    // Fetch latest salary data from user API
+    const employee = employees.find(emp => emp.id === salary.user?.id);
+    
     // Populate form with existing salary data
     setFormData({
       user: salary.user?.id.toString() || '',
       year: salary.year,
       month: salary.month,
       attendance: '',
-      basic_salary: salary.basic_salary,
-      hra: salary.hra,
-      allowance: salary.allowance,
+      basic_salary: employee?.basic_salary?.toString() || salary.basic_salary,
+      hra: employee?.hra?.toString() || salary.hra,
+      allowance: employee?.allowance?.toString() || salary.allowance,
       total_working_days: salary.total_working_days,
       present_days: salary.present_days,
       absent_days: salary.absent_days,
@@ -372,8 +396,7 @@ export function SalaryManagement() {
         toast.error("Failed to delete salary");
       }
     } catch (error) {
-      console.error("Error deleting salary:", error);
-      toast.error("Failed to delete salary");
+            toast.error("Failed to delete salary");
     }
   };
 
@@ -431,10 +454,6 @@ export function SalaryManagement() {
         payload.attendance = formData.attendance;
       }
       
-      console.log('Submitting payload:', payload);
-      console.log('URL:', editingId ? `${config.api.host}${config.api.salary}${editingId}/` : `${config.api.host}${config.api.salary}`);
-      
-      // Make API request (PATCH for update, POST for create)
       const response = await makeAuthenticatedRequest(
         editingId 
           ? `${config.api.host}${config.api.salary}${editingId}/`
@@ -444,8 +463,6 @@ export function SalaryManagement() {
           body: JSON.stringify(payload)
         }
       );
-      
-      console.log('Response status:', response.status);
       
       if (response.ok) {
         const salaryData = await response.json();
@@ -465,13 +482,10 @@ export function SalaryManagement() {
             if (emailResponse.ok) {
               toast.success("Salary email sent to employee");
             } else {
-              const errorData = await emailResponse.json().catch(() => ({}));
-              console.error('Email error:', errorData);
               toast.error("Salary created but failed to send email");
             }
           } catch (emailError) {
-            console.error("Error sending email:", emailError);
-            toast.error("Salary created but failed to send email");
+                        toast.error("Salary created but failed to send email");
           }
         }
         
@@ -497,9 +511,7 @@ export function SalaryManagement() {
         });
         fetchSalaries(); // Refresh salary list
       } else {
-        // Handle error response
         const errorText = await response.text();
-        console.error('Error response:', errorText);
         let errorMsg = 'Failed to save salary';
         try {
           const errorData = JSON.parse(errorText);
@@ -510,8 +522,7 @@ export function SalaryManagement() {
         toast.error(errorMsg);
       }
     } catch (error) {
-      console.error("Error:", error);
-      toast.error("Failed to save salary: " + (error instanceof Error ? error.message : 'Unknown error'));
+            toast.error("Failed to save salary: " + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setLoading(false);
     }
@@ -565,21 +576,15 @@ export function SalaryManagement() {
                 <div className="card-body">
                   <h6 className="mb-3 fw-bold" style={{ color: '#2c3e50' }}><i className="bi bi-person-badge me-2"></i>Employee & Period Details</h6>
                   <div className="row">
-                    <div className="col-md-6 mb-3">
+                    <div className="col-12 col-md-6 mb-3">
                       <label className="form-label fw-semibold text-secondary"><i className="bi bi-person me-1"></i>Employee *</label>
                       <select
                         className="form-select shadow-sm"
                         value={formData.user}
                         onChange={(e) => {
                           const selectedEmp = employees.find(emp => emp.id === parseInt(e.target.value));
-                          console.log('Selected employee:', selectedEmp);
                           if (selectedEmp) {
                             setSelectedEmployeeBankInfo({
-                              bank_name: selectedEmp.bank_name,
-                              bank_account_number: selectedEmp.bank_account_number,
-                              ifsc_code: selectedEmp.ifsc_code
-                            });
-                            console.log('Bank info set:', {
                               bank_name: selectedEmp.bank_name,
                               bank_account_number: selectedEmp.bank_account_number,
                               ifsc_code: selectedEmp.ifsc_code
@@ -593,15 +598,19 @@ export function SalaryManagement() {
                         style={{borderRadius: '8px', padding: '10px', border: '1px solid #dee2e6', background: '#ffffff'}}
                       >
                         <option value="">Select Employee</option>
-                        {employees.map(emp => (
-                          <option key={emp.id} value={emp.id}>
-                            {emp.first_name} {emp.last_name} - {emp.emp_code || 'N/A'}
-                          </option>
-                        ))}
+                        {employees.map(emp => {
+                          const empSalary = salaryRecords.find(s => s.user?.id === emp.id && s.month === formData.month && s.year === formData.year);
+                          const status = empSalary ? (empSalary.payment_status === 'paid' ? ' ✅ Paid' : ' ⚠️ Unpaid') : ' 🔴 Not Created';
+                          return (
+                            <option key={emp.id} value={emp.id}>
+                              {emp.first_name} {emp.last_name} - {emp.emp_code || 'N/A'}{status}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
 
-                    <div className="col-md-3 mb-3">
+                    <div className="col-12 col-md-3 mb-3">
                       <label className="form-label fw-semibold text-secondary"><i className="bi bi-calendar-event me-1"></i>Year *</label>
                       <select
                         className="form-select shadow-sm"
@@ -619,7 +628,7 @@ export function SalaryManagement() {
                       </select>
                     </div>
 
-                    <div className="col-md-3 mb-3">
+                    <div className="col-12 col-md-3 mb-3">
                       <label className="form-label fw-semibold text-secondary"><i className="bi bi-calendar-month me-1"></i>Month *</label>
                       <select
                         className="form-select shadow-sm"
@@ -645,15 +654,15 @@ export function SalaryManagement() {
                   <div className="card-body">
                     <h6 className="mb-3 fw-bold" style={{ color: '#2c3e50' }}><i className="bi bi-bank me-2"></i>Bank Details</h6>
                     <div className="row">
-                      <div className="col-md-4 mb-3">
+                      <div className="col-12 col-md-4 mb-3">
                         <label className="form-label fw-semibold text-secondary">Bank Name</label>
                         <input type="text" className="form-control" value={selectedEmployeeBankInfo.bank_name || 'Not Available'} readOnly style={{borderRadius: '8px', padding: '10px', background: '#f8f9fa'}} />
                       </div>
-                      <div className="col-md-4 mb-3">
+                      <div className="col-12 col-md-4 mb-3">
                         <label className="form-label fw-semibold text-secondary">Account Number</label>
                         <input type="text" className="form-control" value={selectedEmployeeBankInfo.bank_account_number || 'Not Available'} readOnly style={{borderRadius: '8px', padding: '10px', background: '#f8f9fa'}} />
                       </div>
-                      <div className="col-md-4 mb-3">
+                      <div className="col-12 col-md-4 mb-3">
                         <label className="form-label fw-semibold text-secondary">IFSC Code</label>
                         <input type="text" className="form-control" value={selectedEmployeeBankInfo.ifsc_code || 'Not Available'} readOnly style={{borderRadius: '8px', padding: '10px', background: '#f8f9fa'}} />
                       </div>
@@ -667,50 +676,47 @@ export function SalaryManagement() {
                 <div className="card-body">
                   <h6 className="mb-3 fw-bold" style={{ color: '#2c3e50' }}><i className="bi bi-currency-rupee me-2"></i>Salary Components</h6>
                   <div className="row">
-                    <div className="col-md-4 mb-3">
+                    <div className="col-12 col-md-4 mb-3">
                       <label className="form-label fw-semibold text-secondary">Basic Salary *</label>
                       <div className="input-group shadow-sm">
-                        <span className="input-group-text text-white" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
+                        <span className="input-group-text text-white d-flex align-items-center" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
                         <input
                           type="number"
                           className="form-control"
                           placeholder="0.00"
                           value={formData.basic_salary}
-                          onChange={(e) => setFormData({ ...formData, basic_salary: e.target.value })}
-                          required
-                          style={{borderRadius: '0 8px 8px 0', padding: '10px', border: '1px solid #dee2e6', borderLeft: 'none', background: '#ffffff'}}
+                          readOnly
+                          style={{borderRadius: '0 8px 8px 0', padding: '10px', border: '1px solid #dee2e6', borderLeft: 'none', background: '#f8f9fa'}}
                         />
                       </div>
                     </div>
 
-                    <div className="col-md-4 mb-3">
+                    <div className="col-12 col-md-4 mb-3">
                       <label className="form-label fw-semibold text-secondary">HRA *</label>
                       <div className="input-group shadow-sm">
-                        <span className="input-group-text text-white" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
+                        <span className="input-group-text text-white d-flex align-items-center" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
                         <input
                           type="number"
                           className="form-control"
                           placeholder="0.00"
                           value={formData.hra}
-                          onChange={(e) => setFormData({ ...formData, hra: e.target.value })}
-                          required
-                          style={{borderRadius: '0 8px 8px 0', padding: '10px', border: '1px solid #dee2e6', borderLeft: 'none', background: '#ffffff'}}
+                          readOnly
+                          style={{borderRadius: '0 8px 8px 0', padding: '10px', border: '1px solid #dee2e6', borderLeft: 'none', background: '#f8f9fa'}}
                         />
                       </div>
                     </div>
 
-                    <div className="col-md-4 mb-3">
+                    <div className="col-12 col-md-4 mb-3">
                       <label className="form-label fw-semibold text-secondary">Allowance *</label>
                       <div className="input-group shadow-sm">
-                        <span className="input-group-text text-white" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
+                        <span className="input-group-text text-white d-flex align-items-center" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
                         <input
                           type="number"
                           className="form-control"
                           placeholder="0.00"
                           value={formData.allowance}
-                          onChange={(e) => setFormData({ ...formData, allowance: e.target.value })}
-                          required
-                          style={{borderRadius: '0 8px 8px 0', padding: '10px', border: '1px solid #dee2e6', borderLeft: 'none', background: '#ffffff'}}
+                          readOnly
+                          style={{borderRadius: '0 8px 8px 0', padding: '10px', border: '1px solid #dee2e6', borderLeft: 'none', background: '#f8f9fa'}}
                         />
                       </div>
                     </div>
@@ -799,7 +805,7 @@ export function SalaryManagement() {
                     <div className="col-md-3 mb-3">
                       <label className="form-label fw-semibold text-secondary">PF Amount</label>
                       <div className="input-group shadow-sm">
-                        <span className="input-group-text text-white" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
+                        <span className="input-group-text text-white d-flex align-items-center" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
                         <input
                           type="number"
                           className="form-control"
@@ -814,7 +820,7 @@ export function SalaryManagement() {
                     <div className="col-md-3 mb-3">
                       <label className="form-label fw-semibold text-secondary">Deduction</label>
                       <div className="input-group shadow-sm">
-                        <span className="input-group-text text-white" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
+                        <span className="input-group-text text-white d-flex align-items-center" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
                         <input
                           type="number"
                           className="form-control"
@@ -830,7 +836,7 @@ export function SalaryManagement() {
                     <div className="col-md-3 mb-3">
                       <label className="form-label fw-semibold text-secondary">Net Salary</label>
                       <div className="input-group shadow-sm">
-                        <span className="input-group-text text-white" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
+                        <span className="input-group-text text-white d-flex align-items-center" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
                         <input
                           type="number"
                           className="form-control fw-bold"
@@ -893,9 +899,9 @@ export function SalaryManagement() {
             {salaryRecords.length === 0 ? (
               <p className="text-center text-muted">No salary records found</p>
             ) : (
-              <div className="table-responsive">
+              <div className="table-responsive" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
                 {/* Table displaying all salary records */}
-                <table className="table table-hover">
+                <table className="table table-hover" style={{ minWidth: '1400px' }}>
                   <thead>
                     <tr>
                       <th>Employee</th>
@@ -914,14 +920,16 @@ export function SalaryManagement() {
                   </thead>
                   <tbody>
                     {/* Map through salary records and display each row */}
-                    {salaryRecords.map(salary => (
+                    {salaryRecords.map(salary => {
+                      const employee = employees.find(emp => emp.id === salary.user?.id);
+                      return (
                       <tr key={salary.id}>
                         <td>{salary.user?.username || 'N/A'}</td>
                         {/* Display month name and year */}
                         <td>{MONTHS.find(m => m.value === salary.month)?.label} {years.find(y => y.id === salary.year)?.year}</td>
-                        <td>₹{salary.basic_salary}</td>
-                        <td>₹{salary.hra}</td>
-                        <td>₹{salary.allowance}</td>
+                        <td>₹{employee?.basic_salary || salary.basic_salary}</td>
+                        <td>₹{employee?.hra || salary.hra}</td>
+                        <td>₹{employee?.allowance || salary.allowance}</td>
                         <td>{salary.present_days}</td>
                         <td>{salary.half_days}</td>
                         <td>{salary.absent_days}</td>
@@ -958,7 +966,8 @@ export function SalaryManagement() {
                         </button>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

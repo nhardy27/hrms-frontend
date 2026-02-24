@@ -17,6 +17,7 @@ export function SalarySlip() {
     fetchSalaryDetails();
   }, [id]);
 
+  // Fetch salary details and user information
   const fetchSalaryDetails = async () => {
     try {
       const url = `${config.api.host}${config.api.salary}${id}/`;
@@ -54,18 +55,17 @@ export function SalarySlip() {
           }
         }
       } else {
-        const errorText = await response.text();
-        console.error('Error response:', errorText);
+        await response.text();
         toast.error("Failed to fetch salary details");
       }
     } catch (error) {
-      console.error("Error:", error);
-      toast.error("Error loading salary slip");
+            toast.error("Error loading salary slip");
     } finally {
       setLoading(false);
     }
   };
 
+  // Print salary slip
   const handlePrint = () => {
     window.print();
   };
@@ -86,7 +86,7 @@ export function SalarySlip() {
     );
   }
 
-  const grossSalary = parseFloat(salary.basic_salary) + parseFloat(salary.hra) + parseFloat(salary.allowance);
+  const grossSalary = parseFloat(salary.userDetails?.basic_salary || salary.basic_salary) + parseFloat(salary.userDetails?.hra || salary.hra) + parseFloat(salary.userDetails?.allowance || salary.allowance);
   const totalDeduction = parseFloat(salary.pf_amount || 0) + parseFloat(salary.deduction || 0);
 
   return (
@@ -147,15 +147,15 @@ export function SalarySlip() {
                   <tbody>
                     <tr>
                       <td><strong>Basic Salary</strong></td>
-                      <td className="text-end">₹ {parseFloat(salary.basic_salary).toFixed(2)}</td>
+                      <td className="text-end">₹ {parseFloat(salary.userDetails?.basic_salary || salary.basic_salary).toFixed(2)}</td>
                     </tr>
                     <tr>
                       <td><strong>HRA</strong></td>
-                      <td className="text-end">₹ {parseFloat(salary.hra).toFixed(2)}</td>
+                      <td className="text-end">₹ {parseFloat(salary.userDetails?.hra || salary.hra).toFixed(2)}</td>
                     </tr>
                     <tr>
                       <td><strong>Allowance</strong></td>
-                      <td className="text-end">₹ {parseFloat(salary.allowance).toFixed(2)}</td>
+                      <td className="text-end">₹ {parseFloat(salary.userDetails?.allowance || salary.allowance).toFixed(2)}</td>
                     </tr>
                     <tr style={{ backgroundColor: '#f8f9fa', fontWeight: 'bold' }}>
                       <td><strong>Gross Salary</strong></td>

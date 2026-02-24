@@ -1,10 +1,14 @@
+import { useState } from 'react';
 import { Attendance } from './types';
 
 interface AttendanceTabProps {
   attendances: Attendance[];
 }
 
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
 export function AttendanceTab({ attendances }: AttendanceTabProps) {
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
   // Get current logged-in user with error handling
   const getCurrentUser = () => {
     try {
@@ -20,9 +24,17 @@ export function AttendanceTab({ attendances }: AttendanceTabProps) {
   const currentUserId = currentUser.id?.toString();
   
   // Filter attendances for current user only
-  const userAttendances = attendances.filter(att => {
+  let userAttendances = attendances.filter(att => {
     return att.user?.toString() === currentUserId;
   });
+  
+  // Filter by selected month if any
+  if (selectedMonth !== 'all') {
+    userAttendances = userAttendances.filter(att => {
+      const attDate = new Date(att.date);
+      return attDate.getMonth() === parseInt(selectedMonth);
+    });
+  }
   
   // Remove duplicates and keep latest entry per date
   const uniqueAttendances = userAttendances.reduce((acc: Attendance[], current) => {
@@ -38,12 +50,30 @@ export function AttendanceTab({ attendances }: AttendanceTabProps) {
     return acc;
   }, []);
 
+  // // Get unique months from attendance data
+  // const availableMonths = [...new Set(attendances.map(att => new Date(att.date).getMonth()))].sort((a, b) => a - b);
+
   return (
     <div className="card shadow-sm border-0" style={{ background: '#ffffff' }}>
       <div className="card-header" style={{ background: '#f8f9fa', borderBottom: '1px solid #e9ecef' }}>
         <h5 className="mb-0" style={{ color: '#2c3e50' }}><i className="bi bi-clock me-2"></i>Recent Attendance</h5>
       </div>
       <div className="card-body">
+        {/* Month Filter Dropdown */}
+        <div className="mb-3">
+          <label className="form-label">Filter by Month:</label>
+          <select 
+            className="form-select" 
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            style={{ maxWidth: '250px' }}
+          >
+            <option value="all">All Months</option>
+            {MONTHS.map((month, index) => (
+              <option key={index} value={index}>{month}</option>
+            ))}
+          </select>
+        </div>
         {userAttendances.length > 0 ? (
           <div className="table-responsive">
             <table className="table table-striped">

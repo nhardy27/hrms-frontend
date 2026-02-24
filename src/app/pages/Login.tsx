@@ -1,6 +1,7 @@
 import { useState, ChangeEvent, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import config from "../../config/global.json";
+import { LoadingAnimation } from "../components/LoadingAnimation";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -49,8 +50,6 @@ const Login = () => {
 
         if (userResponse.ok) {
           const userData = await userResponse.json();
-          console.log('User API Response:', userData);
-          console.log('Looking for username:', formData.username);
           
           const currentUser = userData.results?.find(
             (user: any) => user.username === formData.username
@@ -58,26 +57,16 @@ const Login = () => {
 
           if (currentUser) {
             localStorage.setItem("user", JSON.stringify(currentUser));
-            
-            console.log('Current User:', currentUser);
-            console.log('is_superuser:', currentUser.is_superuser);
-            console.log('is_staff:', currentUser.is_staff);
 
-            // Redirect based on user role
             if (currentUser.is_superuser === true || currentUser.username === 'admin') {
-              console.log('Redirecting to admin dashboard');
               navigate("/admin-dashboard");
             } else {
-              console.log('Redirecting to employee dashboard');
               navigate("/employee-dashboard");
             }
           } else {
-            console.error('User not found in results');
-            console.error('Available users:', userData.results?.map((u: any) => u.username));
             setError("User not found in system");
           }
         } else {
-          console.error('Failed to fetch user details, status:', userResponse.status);
           setError("Failed to get user details");
         }
       } else {
@@ -90,6 +79,10 @@ const Login = () => {
       setLoading(false);
     }
   };
+
+  if (loading) {
+    return <LoadingAnimation />;
+  }
 
   return (
     <div className="min-vh-100 d-flex align-items-center justify-content-center" style={{ background: '#f8f9fa' }}>

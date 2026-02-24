@@ -39,8 +39,7 @@ export function DepartmentPage() {
         return data.access;
       }
     } catch (error) {
-      console.error('Error refreshing token:', error);
-    }
+          }
     return null;
   };
 
@@ -49,8 +48,7 @@ export function DepartmentPage() {
     const password = localStorage.getItem('password');
     
     if (!username || !password) {
-      console.error('No login credentials found');
-      return null;
+            return null;
     }
 
     try {
@@ -68,8 +66,7 @@ export function DepartmentPage() {
         return data.access;
       }
     } catch (error) {
-      console.error('Error getting token:', error);
-    }
+          }
     return null;
   };
 
@@ -112,8 +109,7 @@ export function DepartmentPage() {
         setDepartments(data.results || []);
       }
     } catch (error) {
-      console.error('Error fetching departments:', error);
-    }
+          }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -150,8 +146,7 @@ export function DepartmentPage() {
       }
       resetForm();
     } catch (error) {
-      console.error('Error saving department:', error);
-      toast.error('Error saving department');
+            toast.error('Error saving department');
     } finally {
       setLoading(false);
     }
@@ -185,8 +180,7 @@ export function DepartmentPage() {
           toast.error('Failed to delete department');
         }
       } catch (error) {
-        console.error('Error deleting department:', error);
-        toast.error('Error deleting department');
+                toast.error('Error deleting department');
       }
     }
   };
@@ -197,12 +191,12 @@ export function DepartmentPage() {
       <div className="container-fluid p-4">
         <div className="card border-0 shadow-lg mb-4" style={{ borderRadius: '15px', background: '#ffffff' }}>
           <div className="card-body p-3">
-            <div className="d-flex justify-content-between align-items-center">
+            <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2">
               <h4 className="mb-0" style={{ color: '#2c3e50' }}><i className="bi bi-building-fill me-2"></i>Departments</h4>
               <button 
-                className="btn px-4 shadow"
+                className="btn px-4 shadow w-100 w-md-auto"
                 onClick={() => setShowForm(true)}
-                style={{ background: '#2c3e50', color: 'white', borderRadius: '8px', border: 'none' }}
+                style={{ background: '#2c3e50', color: 'white', borderRadius: '8px', border: 'none', maxWidth: '200px' }}
               >
                 <i className="bi bi-plus-circle me-2"></i>
                 Add Department
@@ -219,7 +213,7 @@ export function DepartmentPage() {
             <div className="card-body">
               <form onSubmit={handleSubmit}>
                 <div className="row g-3">
-                  <div className="col-md-8">
+                  <div className="col-12 col-md-8">
                     <label className="form-label">Department Name</label>
                     <input
                       type="text"
@@ -229,7 +223,7 @@ export function DepartmentPage() {
                       required
                     />
                   </div>
-                  <div className="col-md-4">
+                  <div className="col-12 col-md-4">
                     <label className="form-label">Status</label>
                     <select
                       className="form-select"
@@ -256,8 +250,8 @@ export function DepartmentPage() {
 
         <div className="card border-0 shadow-lg" style={{ borderRadius: '15px' }}>
           <div className="card-body">
-            <div className="table-responsive">
-              <table className="table table-hover">
+            <div className="table-responsive" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <table className="table table-hover" style={{ minWidth: '800px' }}>
                 <thead>
                   <tr>
                     <th>Department Name</th>
