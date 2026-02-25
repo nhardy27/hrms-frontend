@@ -87,7 +87,7 @@ export function SalarySlip() {
   }
 
   const grossSalary = parseFloat(salary.userDetails?.basic_salary || salary.basic_salary) + parseFloat(salary.userDetails?.hra || salary.hra) + parseFloat(salary.userDetails?.allowance || salary.allowance);
-  const totalDeduction = parseFloat(salary.pf_amount || 0) + parseFloat(salary.deduction || 0);
+  const totalDeduction = parseFloat(salary.deduction || 0);
 
   return (
     <AdminLayout title="Salary Slip">
@@ -161,6 +161,7 @@ export function SalarySlip() {
                       <td><strong>Gross Salary</strong></td>
                       <td className="text-end"><strong>₹ {grossSalary.toFixed(2)}</strong></td>
                     </tr>
+
                   </tbody>
                 </table>
               </div>
@@ -169,21 +170,22 @@ export function SalarySlip() {
                 <table className="table table-bordered">
                   <tbody>
                     <tr>
+                      <td><strong>Unpaid Leave Deduction</strong></td>
+                      <td className="text-end">₹ {parseFloat(salary.loss_of_pay || 0).toFixed(2)}</td>
+                    </tr>
+                    <tr>
                       <td><strong>PF ({salary.pf_percentage || 0}%)</strong></td>
                       <td className="text-end">₹ {parseFloat(salary.pf_amount || 0).toFixed(2)}</td>
-                    </tr>
-                    <tr>
-                      <td><strong>Deduction</strong></td>
-                      <td className="text-end">₹ {parseFloat(salary.deduction || 0).toFixed(2)}</td>
-                    </tr>
-                    <tr>
-                      <td></td>
-                      <td></td>
                     </tr>
                     <tr style={{ backgroundColor: '#f8f9fa', fontWeight: 'bold' }}>
                       <td><strong>Total Deduction</strong></td>
                       <td className="text-end"><strong>₹ {totalDeduction.toFixed(2)}</strong></td>
                     </tr>
+                    <tr>
+                      <td><strong>Earned Salary</strong></td>
+                      <td className="text-end">₹ {parseFloat(salary.earned_salary || 0).toFixed(2)}</td>
+                    </tr>
+                    
                   </tbody>
                 </table>
               </div>
@@ -208,6 +210,21 @@ export function SalarySlip() {
                     </tr>
                   </tbody>
                 </table>
+              </div>
+            </div>
+
+            <div className="row mb-4">
+              <div className="col-12">
+                <h5 style={{ color: '#2c3e50', marginBottom: '20px' }}>SALARY CALCULATION </h5>
+                <div style={{ background: '#f8f9fa', padding: '15px', borderRadius: '8px', fontSize: '13px', color: '#495057' }}>
+                  {/* <p className="mb-2"><strong>Gross Salary:</strong> Basic (₹{parseFloat(salary.userDetails?.basic_salary || salary.basic_salary).toFixed(2)}) + HRA (₹{parseFloat(salary.userDetails?.hra || salary.hra).toFixed(2)}) + Allowance (₹{parseFloat(salary.userDetails?.allowance || salary.allowance).toFixed(2)}) = ₹{parseFloat(salary.gross_salary || 0).toFixed(2)}</p>
+                  <p className="mb-2"><strong>Per Day Salary:</strong> Gross Salary (₹{parseFloat(salary.gross_salary || 0).toFixed(2)}) ÷ Total Working Days ({salary.total_working_days}) = ₹{(parseFloat(salary.gross_salary || 0) / salary.total_working_days).toFixed(2)}</p>
+                  <p className="mb-2"><strong>Earned Salary:</strong> Per Day Salary (₹{(parseFloat(salary.gross_salary || 0) / salary.total_working_days).toFixed(2)}) × Present Days ({salary.present_days}) = ₹{parseFloat(salary.earned_salary || 0).toFixed(2)}</p>
+                  <p className="mb-2"><strong>Loss of Pay:</strong> Per Day Salary (₹{(parseFloat(salary.gross_salary || 0) / salary.total_working_days).toFixed(2)}) × Absent Days ({salary.absent_days}) = ₹{parseFloat(salary.loss_of_pay || 0).toFixed(2)}</p>
+                  <p className="mb-2"><strong>PF Calculation:</strong> Basic Per Day (₹{(parseFloat(salary.userDetails?.basic_salary || salary.basic_salary) / salary.total_working_days).toFixed(2)}) × Present Days ({salary.present_days}) × PF% ({salary.pf_percentage}%) = ₹{parseFloat(salary.pf_amount || 0).toFixed(2)}</p>
+                  <p className="mb-2"><strong>Total Deduction:</strong> Loss of Pay (₹{parseFloat(salary.loss_of_pay || 0).toFixed(2)}) + PF (₹{parseFloat(salary.pf_amount || 0).toFixed(2)}) = ₹{parseFloat(salary.deduction || 0).toFixed(2)}</p> */}
+                  <p className="mb-0"><strong>Net Salary:</strong> Earned Salary (₹{parseFloat(salary.earned_salary || 0).toFixed(2)}) - PF (₹{parseFloat(salary.pf_amount || 0).toFixed(2)}) = ₹{parseFloat(salary.net_salary).toFixed(2)}</p>
+                </div>
               </div>
             </div>
 

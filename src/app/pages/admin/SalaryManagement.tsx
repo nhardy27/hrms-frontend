@@ -58,9 +58,13 @@ interface SalaryRecord {
   present_days: number;
   absent_days: number;
   half_days: number;
-  deduction: string;
+  gross_salary: string;
+  per_day_salary: string;
+  unpaid_leave_deduction: string;
+  earned_salary: string;
   pf_percentage: string;
   pf_amount: string;
+  deduction: string;
   net_salary: string;
   payment_status: string;
 }
@@ -78,9 +82,13 @@ interface SalaryForm {
   present_days: number;
   absent_days: number;
   half_days: number;
-  deduction: string;
+  gross_salary: string;
+  per_day_salary: string;
+  unpaid_leave_deduction: string;
+  earned_salary: string;
   pf_percentage: string;
   pf_amount: string;
+  deduction: string;
   net_salary: string;
   payment_status: string;
 }
@@ -118,22 +126,25 @@ export function SalaryManagement() {
   // Loading state for form submission
   const [loading, setLoading] = useState(false);
   
-  // Form data state with initial values
   const [formData, setFormData] = useState<SalaryForm>({
     user: '',
     year: '',
-    month: new Date().getMonth() + 1, // Current month
+    month: new Date().getMonth() + 1,
     attendance: '',
     basic_salary: '',
     hra: '',
     allowance: '',
-    total_working_days: 26, // Default working days
+    total_working_days: 26,
     present_days: 0,
     absent_days: 0,
     half_days: 0,
-    deduction: '0',
+    gross_salary: '0',
+    per_day_salary: '0',
+    unpaid_leave_deduction: '0',
+    earned_salary: '0',
     pf_percentage: '12.00',
     pf_amount: '0',
+    deduction: '0',
     net_salary: '0',
     payment_status: 'unpaid'
   });
@@ -177,11 +188,47 @@ export function SalaryManagement() {
   // Effect runs when salary components change - recalculates net salary
   useEffect(() => {
     const absentDays = formData.total_working_days - formData.present_days - formData.half_days;
-    if (formData.absent_days !== absentDays) {
-      setFormData(prev => ({ ...prev, absent_days: absentDays }));
-    }
-    calculateNetSalary();
-  }, [formData.basic_salary, formData.hra, formData.allowance, formData.deduction, formData.pf_percentage, formData.present_days, formData.half_days, formData.total_working_days]);
+    
+    const basic = parseFloat(formData.basic_salary) || 0;
+    const hra = parseFloat(formData.hra) || 0;
+    const allowance = parseFloat(formData.allowance) || 0;
+    const pfPercentage = parseFloat(formData.pf_percentage) || 0;
+    
+    // Gross Salary = Basic + HRA + Allowance
+    const grossSalary = basic + hra + allowance;
+    
+    // Per Day Salary
+    const perDaySalary = grossSalary / formData.total_working_days;
+    
+    // Unpaid Leave Deduction = Per Day × Absent Days
+    const unpaidLeaveDeduction = perDaySalary * absentDays;
+    
+    // Earned Salary = Gross - Unpaid Leave Deduction
+    const earnedSalary = grossSalary - unpaidLeaveDeduction;
+    
+    // PF Amount = (Basic / Total Days × (Present + Half×0.5)) × PF%
+    const perDayBasic = basic / formData.total_working_days;
+    const earnedBasic = (formData.present_days * perDayBasic) + (formData.half_days * perDayBasic * 0.5);
+    const pfAmount = (earnedBasic * pfPercentage) / 100;
+    
+    // Total Deduction = Unpaid Leave Deduction + PF
+    const totalDeduction = unpaidLeaveDeduction + pfAmount;
+    
+    // Net Salary = Earned Salary - PF Amount
+    const netSalary = earnedSalary - pfAmount;
+    
+    setFormData(prev => ({
+      ...prev,
+      absent_days: absentDays,
+      gross_salary: grossSalary.toFixed(2),
+      per_day_salary: perDaySalary.toFixed(2),
+      unpaid_leave_deduction: unpaidLeaveDeduction.toFixed(2),
+      earned_salary: earnedSalary.toFixed(2),
+      pf_amount: pfAmount.toFixed(2),
+      deduction: totalDeduction.toFixed(2),
+      net_salary: netSalary.toFixed(2)
+    }));
+  }, [formData.basic_salary, formData.hra, formData.allowance, formData.pf_percentage, formData.present_days, formData.half_days, formData.total_working_days]);
 
   // Function to fetch all salary records from API
   const fetchSalaries = async () => {
@@ -316,41 +363,6 @@ export function SalaryManagement() {
   };
 
 
-  // Function to calculate net salary based on components and attendance
-  const calculateNetSalary = () => {
-    // Parse salary components
-    const basic = parseFloat(formData.basic_salary) || 0;
-    const hra = parseFloat(formData.hra) || 0;
-    const allowance = parseFloat(formData.allowance) || 0;
-    const deduction = parseFloat(formData.deduction) || 0;
-    const pfPercentage = parseFloat(formData.pf_percentage) || 0;
-    
-    // Calculate per day salary for each component
-    const perDayBasic = basic / formData.total_working_days;
-    const perDayHra = hra / formData.total_working_days;
-    const perDayAllowance = allowance / formData.total_working_days;
-    
-    // Calculate earned salary for each component (full days + half days at 50%)
-    const earnedBasic = (formData.present_days * perDayBasic) + (formData.half_days * perDayBasic * 0.5);
-    const earnedHra = (formData.present_days * perDayHra) + (formData.half_days * perDayHra * 0.5);
-    const earnedAllowance = (formData.present_days * perDayAllowance) + (formData.half_days * perDayAllowance * 0.5);
-    
-    const earnedSalary = earnedBasic + earnedHra + earnedAllowance;
-    
-    // Calculate PF amount on earned basic salary (not full basic salary)
-    const pfAmount = (earnedBasic * pfPercentage) / 100;
-    
-    // Calculate final net salary after deductions and PF
-    const netSalary = earnedSalary - deduction - pfAmount;
-    
-    // Update form with calculated values
-    setFormData(prev => ({ 
-      ...prev, 
-      pf_amount: pfAmount.toFixed(2),
-      net_salary: netSalary.toFixed(2) 
-    }));
-  };
-
   // Function to handle viewing salary slip
   const handleView = (salary: SalaryRecord) => {
     navigate(`/salary-slip/${salary.id}`);
@@ -364,7 +376,6 @@ export function SalaryManagement() {
     // Fetch latest salary data from user API
     const employee = employees.find(emp => emp.id === salary.user?.id);
     
-    // Populate form with existing salary data
     setFormData({
       user: salary.user?.id.toString() || '',
       year: salary.year,
@@ -377,9 +388,13 @@ export function SalaryManagement() {
       present_days: salary.present_days,
       absent_days: salary.absent_days,
       half_days: salary.half_days,
-      deduction: salary.deduction,
+      gross_salary: salary.gross_salary,
+      per_day_salary: salary.per_day_salary,
+      unpaid_leave_deduction: salary.unpaid_leave_deduction,
+      earned_salary: salary.earned_salary,
       pf_percentage: salary.pf_percentage,
       pf_amount: salary.pf_amount,
+      deduction: salary.deduction,
       net_salary: salary.net_salary,
       payment_status: salary.payment_status
     });
@@ -439,7 +454,6 @@ export function SalaryManagement() {
     
     setLoading(true);
     try {
-      // Prepare payload for API
       const payload: any = {
         user: parseInt(formData.user),
         year: formData.year,
@@ -451,9 +465,13 @@ export function SalaryManagement() {
         present_days: formData.present_days,
         absent_days: formData.absent_days,
         half_days: formData.half_days,
-        deduction: parseFloat(formData.deduction).toFixed(2),
+        gross_salary: parseFloat(formData.gross_salary).toFixed(2),
+        per_day_salary: parseFloat(formData.per_day_salary).toFixed(2),
+        unpaid_leave_deduction: parseFloat(formData.unpaid_leave_deduction).toFixed(2),
+        earned_salary: parseFloat(formData.earned_salary).toFixed(2),
         pf_percentage: parseFloat(formData.pf_percentage).toFixed(2),
         pf_amount: parseFloat(formData.pf_amount).toFixed(2),
+        deduction: parseFloat(formData.deduction).toFixed(2),
         net_salary: parseFloat(formData.net_salary).toFixed(2),
         payment_status: formData.payment_status
       };
@@ -498,8 +516,6 @@ export function SalaryManagement() {
           }
         }
         
-        // Reset form and editing state
-        setEditingId(null);
         setFormData({
           user: '',
           year: '',
@@ -512,9 +528,13 @@ export function SalaryManagement() {
           present_days: 0,
           absent_days: 0,
           half_days: 0,
-          deduction: '0',
+          gross_salary: '0',
+          per_day_salary: '0',
+          unpaid_leave_deduction: '0',
+          earned_salary: '0',
           pf_percentage: '12.00',
           pf_amount: '0',
+          deduction: '0',
           net_salary: '0',
           payment_status: 'unpaid'
         });
@@ -553,7 +573,6 @@ export function SalaryManagement() {
                 className="btn btn-sm shadow-sm"
                 style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '6px' }}
                 onClick={() => {
-                  setEditingId(null);
                   setFormData({
                     user: '',
                     year: '',
@@ -566,9 +585,13 @@ export function SalaryManagement() {
                     present_days: 0,
                     absent_days: 0,
                     half_days: 0,
-                    deduction: '0',
+                    gross_salary: '0',
+                    per_day_salary: '0',
+                    unpaid_leave_deduction: '0',
+                    earned_salary: '0',
                     pf_percentage: '12.00',
                     pf_amount: '0',
+                    deduction: '0',
                     net_salary: '0',
                     payment_status: 'unpaid'
                   });
@@ -796,6 +819,66 @@ export function SalaryManagement() {
                 <div className="card-body">
                   <h6 className="mb-3 fw-bold" style={{ color: '#2c3e50' }}><i className="bi bi-calculator me-2"></i>Final Calculation</h6>
                   <div className="row">
+                    {/* Gross Salary - Auto-calculated, read-only */}
+                    <div className="col-md-3 mb-3">
+                      <label className="form-label fw-semibold text-secondary">Gross Salary</label>
+                      <div className="input-group shadow-sm">
+                        <span className="input-group-text text-white d-flex align-items-center" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
+                        <input
+                          type="number"
+                          className="form-control"
+                          value={formData.gross_salary}
+                          readOnly
+                          style={{borderRadius: '0 8px 8px 0', padding: '10px', background: '#f8f9fa'}}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Per Day Salary - Auto-calculated, read-only */}
+                    <div className="col-md-3 mb-3">
+                      <label className="form-label fw-semibold text-secondary">Per Day Salary</label>
+                      <div className="input-group shadow-sm">
+                        <span className="input-group-text text-white d-flex align-items-center" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
+                        <input
+                          type="number"
+                          className="form-control"
+                          value={formData.per_day_salary}
+                          readOnly
+                          style={{borderRadius: '0 8px 8px 0', padding: '10px', background: '#f8f9fa'}}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Unpaid Leave Deduction - Auto-calculated, read-only */}
+                    <div className="col-md-3 mb-3">
+                      <label className="form-label fw-semibold text-secondary">Unpaid Leave Deduction</label>
+                      <div className="input-group shadow-sm">
+                        <span className="input-group-text text-white d-flex align-items-center" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
+                        <input
+                          type="number"
+                          className="form-control"
+                          value={formData.unpaid_leave_deduction}
+                          readOnly
+                          style={{borderRadius: '0 8px 8px 0', padding: '10px', background: '#f8f9fa'}}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Earned Salary - Auto-calculated, read-only */}
+                    <div className="col-md-3 mb-3">
+                      <label className="form-label fw-semibold text-secondary">Earned Salary</label>
+                      <div className="input-group shadow-sm">
+                        <span className="input-group-text text-white d-flex align-items-center" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
+                        <input
+                          type="number"
+                          className="form-control"
+                          value={formData.earned_salary}
+                          readOnly
+                          style={{borderRadius: '0 8px 8px 0', padding: '10px', background: '#f8f9fa'}}
+                        />
+                      </div>
+                    </div>
+
                     {/* PF Percentage input field */}
                     <div className="col-md-3 mb-3">
                       <label className="form-label fw-semibold text-secondary">PF Percentage (%)</label>
@@ -825,18 +908,17 @@ export function SalaryManagement() {
                       </div>
                     </div>
 
-                    {/* Deduction input field */}
+                    {/* Total Deduction - Auto-calculated, read-only */}
                     <div className="col-md-3 mb-3">
-                      <label className="form-label fw-semibold text-secondary">Deduction</label>
+                      <label className="form-label fw-semibold text-secondary">Total Deduction</label>
                       <div className="input-group shadow-sm">
                         <span className="input-group-text text-white d-flex align-items-center" style={{borderRadius: '8px 0 0 8px', background: '#2c3e50'}}>₹</span>
                         <input
                           type="number"
                           className="form-control"
-                          placeholder="0.00"
                           value={formData.deduction}
-                          onChange={(e) => setFormData({ ...formData, deduction: e.target.value })}
-                          style={{borderRadius: '0 8px 8px 0', padding: '10px', border: '1px solid #dee2e6', borderLeft: 'none', background: '#ffffff'}}
+                          readOnly
+                          style={{borderRadius: '0 8px 8px 0', padding: '10px', background: '#f8f9fa'}}
                         />
                       </div>
                     </div>
@@ -987,3 +1069,22 @@ export function SalaryManagement() {
     </AdminLayout>
   );
 }
+
+
+
+
+
+// Gross Salary = Basic + HRA + Allowance
+// Per Day Salary = Gross Salary / Total Working Days
+// Earned Salary = Per Day Salary × Present Days
+// Unpaid Leave Deduction = Per Day Salary × Absent Days
+
+
+// pf 
+// Basic per day = 10000 / 26 = 384.61
+// 2 din ka basic = 384.61 × 2 = 769.23
+// PF = 12% of 769.23 = 92.30 
+
+// Total Deduction = Unpaid Leave Deduction + PF
+
+// Net Salary = Earned Salary - PF
