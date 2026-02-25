@@ -176,6 +176,10 @@ export function SalaryManagement() {
 
   // Effect runs when salary components change - recalculates net salary
   useEffect(() => {
+    const absentDays = formData.total_working_days - formData.present_days - formData.half_days;
+    if (formData.absent_days !== absentDays) {
+      setFormData(prev => ({ ...prev, absent_days: absentDays }));
+    }
     calculateNetSalary();
   }, [formData.basic_salary, formData.hra, formData.allowance, formData.deduction, formData.pf_percentage, formData.present_days, formData.half_days, formData.total_working_days]);
 
@@ -321,15 +325,20 @@ export function SalaryManagement() {
     const deduction = parseFloat(formData.deduction) || 0;
     const pfPercentage = parseFloat(formData.pf_percentage) || 0;
     
-    // Calculate total salary and per day salary
-    const totalSalary = basic + hra + allowance;
-    const perDaySalary = totalSalary / formData.total_working_days;
+    // Calculate per day salary for each component
+    const perDayBasic = basic / formData.total_working_days;
+    const perDayHra = hra / formData.total_working_days;
+    const perDayAllowance = allowance / formData.total_working_days;
     
-    // Calculate earned salary (full days + half days at 50%)
-    const earnedSalary = (formData.present_days * perDaySalary) + (formData.half_days * perDaySalary * 0.5);
+    // Calculate earned salary for each component (full days + half days at 50%)
+    const earnedBasic = (formData.present_days * perDayBasic) + (formData.half_days * perDayBasic * 0.5);
+    const earnedHra = (formData.present_days * perDayHra) + (formData.half_days * perDayHra * 0.5);
+    const earnedAllowance = (formData.present_days * perDayAllowance) + (formData.half_days * perDayAllowance * 0.5);
     
-    // Calculate PF amount
-    const pfAmount = (basic * pfPercentage) / 100;
+    const earnedSalary = earnedBasic + earnedHra + earnedAllowance;
+    
+    // Calculate PF amount on earned basic salary (not full basic salary)
+    const pfAmount = (earnedBasic * pfPercentage) / 100;
     
     // Calculate final net salary after deductions and PF
     const netSalary = earnedSalary - deduction - pfAmount;
