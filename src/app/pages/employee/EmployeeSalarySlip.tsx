@@ -68,7 +68,9 @@ export function EmployeeSalarySlip() {
   }
 
   const grossSalary = parseFloat(salary.userDetails?.basic_salary || salary.basic_salary) + parseFloat(salary.userDetails?.hra || salary.hra) + parseFloat(salary.userDetails?.allowance || salary.allowance);
-  const totalDeduction = parseFloat(salary.pf_amount || 0) + parseFloat(salary.deduction || 0);
+  const pfAmount = parseFloat(salary.pf_amount || 0);
+  const totalDeduction = parseFloat(salary.deduction || 0);
+  const lossOfPay = totalDeduction - pfAmount;
 
   return (
     <>
@@ -84,7 +86,7 @@ export function EmployeeSalarySlip() {
 
             <hr style={{ border: '2px solid #2c3e50' }} />
 
-            <div className="row mb-3">
+            <div className="row mb-4">
               <div className="col-6">
                 <p><strong>Employee Name:</strong> {salary.userDetails?.first_name || ''} {salary.userDetails?.last_name || ''}</p>
                 <p><strong>Employee Code:</strong> {salary.userDetails?.emp_code || salary.user?.username || 'N/A'}</p>
@@ -97,9 +99,9 @@ export function EmployeeSalarySlip() {
               </div>
             </div>
 
-            <div className="text-center mb-3" style={{ padding: '10px', backgroundColor: '#f8f9fa' }}>
+            <div className="text-center mb-3">
               <strong>Payment Status: </strong>
-              <span className={`badge ${salary.payment_status === 'paid' ? 'bg-success' : 'bg-warning'}`} style={{ padding: '6px 12px', fontSize: '12px', border: '1px solid #333' }}>
+              <span className={`badge ${salary.payment_status === 'paid' ? 'bg-success' : 'bg-warning'}`} style={{ padding: '6px 12px', fontSize: '12px' }}>
                 {salary.payment_status.toUpperCase()}
               </span>
               {salary.payment_date && (
@@ -111,70 +113,70 @@ export function EmployeeSalarySlip() {
 
             <hr />
 
-            <div className="row mb-3">
+            <div className="row mb-4">
               <div className="col-6">
-                <h6 style={{ color: '#333', marginBottom: '15px', fontWeight: 'bold', backgroundColor: '#f2f2f2', padding: '10px', border: '1px solid #ddd' }}>EARNINGS</h6>
-                <table className="table table-bordered" style={{ fontSize: '13px' }}>
+                <h5 style={{ color: '#2c3e50', marginBottom: '20px' }}>EARNINGS</h5>
+                <table className="table table-bordered">
                   <tbody>
                     <tr>
-                      <td style={{ fontWeight: 'bold' }}>Basic Salary</td>
-                      <td className="text-end">₹{parseFloat(salary.userDetails?.basic_salary || salary.basic_salary).toFixed(2)}</td>
+                      <td><strong>Basic Salary</strong></td>
+                      <td className="text-end">₹ {parseFloat(salary.userDetails?.basic_salary || salary.basic_salary).toFixed(2)}</td>
                     </tr>
                     <tr>
-                      <td style={{ fontWeight: 'bold' }}>HRA</td>
-                      <td className="text-end">₹{parseFloat(salary.userDetails?.hra || salary.hra).toFixed(2)}</td>
+                      <td><strong>HRA</strong></td>
+                      <td className="text-end">₹ {parseFloat(salary.userDetails?.hra || salary.hra).toFixed(2)}</td>
                     </tr>
                     <tr>
-                      <td style={{ fontWeight: 'bold' }}>Allowance</td>
-                      <td className="text-end">₹{parseFloat(salary.userDetails?.allowance || salary.allowance).toFixed(2)}</td>
+                      <td><strong>Allowance</strong></td>
+                      <td className="text-end">₹ {parseFloat(salary.userDetails?.allowance || salary.allowance).toFixed(2)}</td>
                     </tr>
-                    <tr style={{ backgroundColor: '#f5f5f5', fontWeight: 'bold' }}>
-                      <td style={{ fontWeight: 'bold' }}>Gross Salary</td>
-                      <td className="text-end"><strong>₹{grossSalary.toFixed(2)}</strong></td>
+                    <tr style={{ backgroundColor: '#f8f9fa', fontWeight: 'bold' }}>
+                      <td><strong>Gross Salary</strong></td>
+                      <td className="text-end"><strong>₹ {grossSalary.toFixed(2)}</strong></td>
                     </tr>
                   </tbody>
                 </table>
               </div>
               <div className="col-6">
-                <h6 style={{ color: '#333', marginBottom: '15px', fontWeight: 'bold', backgroundColor: '#f2f2f2', padding: '10px', border: '1px solid #ddd' }}>DEDUCTIONS</h6>
-                <table className="table table-bordered" style={{ fontSize: '13px' }}>
+                <h5 style={{ color: '#2c3e50', marginBottom: '20px' }}>DEDUCTIONS</h5>
+                <table className="table table-bordered">
                   <tbody>
                     <tr>
-                      <td style={{ fontWeight: 'bold' }}>PF ({salary.pf_percentage || 0}%)</td>
-                      <td className="text-end">₹{parseFloat(salary.pf_amount || 0).toFixed(2)}</td>
+                      <td><strong>Unpaid Leave Deduction</strong></td>
+                      <td className="text-end">₹ {lossOfPay.toFixed(2)}</td>
                     </tr>
                     <tr>
-                      <td style={{ fontWeight: 'bold' }}>Deduction</td>
-                      <td className="text-end">₹{parseFloat(salary.deduction || 0).toFixed(2)}</td>
+                      <td><strong>PF ({salary.pf_percentage || 0}%)</strong></td>
+                      <td className="text-end">₹ {parseFloat(salary.pf_amount || 0).toFixed(2)}</td>
+                    </tr>
+                    <tr style={{ backgroundColor: '#f8f9fa', fontWeight: 'bold' }}>
+                      <td><strong>Total Deduction</strong></td>
+                      <td className="text-end"><strong>₹ {totalDeduction.toFixed(2)}</strong></td>
                     </tr>
                     <tr>
-                      <td></td>
-                      <td></td>
-                    </tr>
-                    <tr style={{ backgroundColor: '#f5f5f5', fontWeight: 'bold' }}>
-                      <td style={{ fontWeight: 'bold' }}>Total Deduction</td>
-                      <td className="text-end"><strong>₹{totalDeduction.toFixed(2)}</strong></td>
+                      <td><strong>Earned Salary</strong></td>
+                      <td className="text-end">₹ {parseFloat(salary.earned_salary || 0).toFixed(2)}</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
             </div>
 
-            <div className="row mb-3">
+            <div className="row mb-4">
               <div className="col-12">
-                <h6 style={{ color: '#333', marginBottom: '15px', fontWeight: 'bold', backgroundColor: '#f2f2f2', padding: '10px', border: '1px solid #ddd' }}>ATTENDANCE</h6>
-                <table className="table table-bordered" style={{ fontSize: '13px' }}>
+                <h5 style={{ color: '#2c3e50', marginBottom: '20px' }}>ATTENDANCE</h5>
+                <table className="table table-bordered">
                   <tbody>
                     <tr>
-                      <td style={{ fontWeight: 'bold', width: '25%' }}>Working Days</td>
+                      <td style={{ width: '25%' }}><strong>Working Days</strong></td>
                       <td className="text-end" style={{ width: '25%' }}>{salary.total_working_days}</td>
-                      <td style={{ fontWeight: 'bold', width: '25%' }}>Present Days</td>
+                      <td style={{ width: '25%' }}><strong>Present Days</strong></td>
                       <td className="text-end" style={{ width: '25%' }}>{salary.present_days}</td>
                     </tr>
                     <tr>
-                      <td style={{ fontWeight: 'bold' }}>Half Days</td>
+                      <td><strong>Half Days</strong></td>
                       <td className="text-end">{salary.half_days}</td>
-                      <td style={{ fontWeight: 'bold' }}>Absent Days</td>
+                      <td><strong>Absent Days</strong></td>
                       <td className="text-end">{salary.absent_days}</td>
                     </tr>
                   </tbody>
@@ -182,25 +184,34 @@ export function EmployeeSalarySlip() {
               </div>
             </div>
 
+            <div className="row mb-4">
+              <div className="col-12">
+                <h5 style={{ color: '#2c3e50', marginBottom: '20px' }}>SALARY CALCULATION </h5>
+                <div style={{ background: '#f8f9fa', padding: '15px', borderRadius: '8px', fontSize: '13px', color: '#495057' }}>
+                  <p className="mb-0"><strong>Net Salary:</strong> Earned Salary (₹{parseFloat(salary.earned_salary || 0).toFixed(2)}) - PF (₹{parseFloat(salary.pf_amount || 0).toFixed(2)}) = ₹{parseFloat(salary.net_salary).toFixed(2)}</p>
+                </div>
+              </div>
+            </div>
+
             <hr style={{ border: '2px solid #2c3e50' }} />
 
-            <div className="row mb-3">
+            <div className="row mb-4">
               <div className="col-12">
                 <table className="table table-bordered">
                   <tbody>
-                    <tr style={{ backgroundColor: '#333', color: 'white', fontSize: '15px' }}>
-                      <td style={{ padding: '12px 10px' }}><strong>NET SALARY</strong></td>
-                      <td className="text-end" style={{ padding: '12px 10px' }}><strong>₹{parseFloat(salary.net_salary).toFixed(2)}</strong></td>
+                    <tr style={{ backgroundColor: '#2c3e50', color: 'white' }}>
+                      <td><strong style={{ fontSize: '18px' }}>NET SALARY</strong></td>
+                      <td className="text-end"><strong style={{ fontSize: '18px' }}>₹ {parseFloat(salary.net_salary).toFixed(2)}</strong></td>
                     </tr>
                   </tbody>
                 </table>
               </div>
             </div>
 
-            <div className="text-center mt-4" style={{ color: '#666', fontSize: '11px', lineHeight: '1.6' }}>
-              <p style={{ margin: '3px 0' }}>This is a computer-generated salary slip.</p>
-              <p style={{ margin: '3px 0' }}>For queries, contact HR department.</p>
-              <p style={{ margin: '3px 0' }}>hr.humbingo@gmail.com</p>
+            <div className="text-center mt-5" style={{ color: '#7f8c8d', fontSize: '12px' }}>
+              <p>This is a computer-generated salary slip.</p>
+              <p>For queries, contact HR department.</p>
+              <p>hr.humbingo@gmail.com</p>
             </div>
           </div>
         </div>
@@ -211,6 +222,21 @@ export function EmployeeSalarySlip() {
           @page {
             margin: 0.5cm;
             size: A4;
+          }
+          body * {
+            visibility: hidden;
+          }
+          .card, .card * {
+            visibility: visible;
+          }
+          .card {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            max-width: 100% !important;
+            box-shadow: none !important;
+            margin: 0 !important;
           }
           body {
             print-color-adjust: exact;

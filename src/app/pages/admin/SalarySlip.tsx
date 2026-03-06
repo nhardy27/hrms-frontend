@@ -87,7 +87,9 @@ export function SalarySlip() {
   }
 
   const grossSalary = parseFloat(salary.userDetails?.basic_salary || salary.basic_salary) + parseFloat(salary.userDetails?.hra || salary.hra) + parseFloat(salary.userDetails?.allowance || salary.allowance);
+  const pfAmount = parseFloat(salary.pf_amount || 0);
   const totalDeduction = parseFloat(salary.deduction || 0);
+  const lossOfPay = totalDeduction - pfAmount;
 
   return (
     <AdminLayout title="Salary Slip">
@@ -171,7 +173,7 @@ export function SalarySlip() {
                   <tbody>
                     <tr>
                       <td><strong>Unpaid Leave Deduction</strong></td>
-                      <td className="text-end">₹ {parseFloat(salary.loss_of_pay || 0).toFixed(2)}</td>
+                      <td className="text-end">₹ {lossOfPay.toFixed(2)}</td>
                     </tr>
                     <tr>
                       <td><strong>PF ({salary.pf_percentage || 0}%)</strong></td>
