@@ -12,6 +12,7 @@ interface LeaveRequest {
   department_name?: string;
   from_date: string;
   to_date: string;
+  total_leave?: number;
   reason: string;
   status?: string;
 }
@@ -126,6 +127,7 @@ export function LeaveManagement() {
                       <th>Department</th>
                       <th>From Date</th>
                       <th>To Date</th>
+                      <th>Total Days</th>
                       <th>Reason</th>
                       <th>Status</th>
                       <th>Actions</th>
@@ -139,6 +141,7 @@ export function LeaveManagement() {
                         <td><span className="badge bg-secondary">{leave.department_name}</span></td>
                         <td>{formatDate(leave.from_date)}</td>
                         <td>{formatDate(leave.to_date)}</td>
+                        <td><span className="badge bg-info">{leave.total_leave || 0}</span></td>
                         <td>{leave.reason}</td>
                         <td>
                           <span className={getStatusBadge(leave.status)}>
