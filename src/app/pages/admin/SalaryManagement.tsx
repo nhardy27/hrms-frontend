@@ -233,30 +233,38 @@ export function SalaryManagement() {
   // Function to fetch all salary records from API
   const fetchSalaries = async () => {
     try {
-      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.salary}`);
-      if (response.ok) {
-        const data = await response.json();
-        const records = (data.results || []).map((record: any) => {
-          if (typeof record.user === 'number') {
-            const emp = employees.find(e => e.id === record.user);
-            return {
-              ...record,
-              user: emp ? { id: emp.id, username: emp.username, email: emp.email } : null
-            };
-          }
-          return record;
-        }).sort((a: SalaryRecord, b: SalaryRecord) => {
-          const yearA = years.find(y => y.id === a.year)?.year || 0;
-          const yearB = years.find(y => y.id === b.year)?.year || 0;
-          if (yearB !== yearA) return yearB - yearA;
-          return b.month - a.month;
-        });
-        setSalaryRecords(records);
-      } else {
-        toast.error('Failed to fetch salary records');
+      let allRecords: any[] = [];
+      let nextUrl = `${config.api.host}${config.api.salary}?page_size=100`;
+      
+      while (nextUrl) {
+        const response = await makeAuthenticatedRequest(nextUrl);
+        if (response.ok) {
+          const data = await response.json();
+          allRecords = [...allRecords, ...(data.results || [])];
+          nextUrl = data.next;
+        } else {
+          break;
+        }
       }
+      
+      const records = allRecords.map((record: any) => {
+        if (typeof record.user === 'number') {
+          const emp = employees.find(e => e.id === record.user);
+          return {
+            ...record,
+            user: emp ? { id: emp.id, username: emp.username, email: emp.email } : null
+          };
+        }
+        return record;
+      }).sort((a: SalaryRecord, b: SalaryRecord) => {
+        const yearA = years.find(y => y.id === a.year)?.year || 0;
+        const yearB = years.find(y => y.id === b.year)?.year || 0;
+        if (yearB !== yearA) return yearB - yearA;
+        return b.month - a.month;
+      });
+      setSalaryRecords(records);
     } catch (error) {
-            toast.error('Error loading salary records');
+      toast.error('Error loading salary records');
     }
   };
 
@@ -330,34 +338,40 @@ export function SalaryManagement() {
 
       if (!selectedEmployee?.emp_code || !selectedYear || !selectedMonth) return;
 
-      const searchUrl = `${config.api.host}${config.api.attendance}?emp_code=${selectedEmployee.emp_code}&year=${selectedYear}&month=${selectedMonth}`;
-      const response = await makeAuthenticatedRequest(searchUrl);
+      let allRecords: Attendance[] = [];
+      let nextUrl = `${config.api.host}${config.api.attendance}?emp_code=${selectedEmployee.emp_code}&year=${selectedYear}&month=${selectedMonth}&page_size=100`;
 
-      if (response.ok) {
-        const data = await response.json();
-        const monthRecords = data.results || data || [];
-
-        let presentDays = 0;
-        let halfDays = 0;
-
-        monthRecords.forEach((att: Attendance) => {
-          if (att.total_hours) {
-            const [hours] = att.total_hours.split(':').map(Number);
-            if (hours >= 7) presentDays++;
-            else if (hours >= 4) halfDays++;
-          }
-        });
-
-        const absentDays = formData.total_working_days - presentDays - halfDays;
-
-        setFormData(prev => ({
-          ...prev,
-          present_days: presentDays,
-          half_days: halfDays,
-          absent_days: absentDays,
-          attendance: monthRecords[0]?.id || ''
-        }));
+      while (nextUrl) {
+        const response = await makeAuthenticatedRequest(nextUrl);
+        if (response.ok) {
+          const data = await response.json();
+          allRecords = [...allRecords, ...(data.results || [])];
+          nextUrl = data.next;
+        } else {
+          break;
+        }
       }
+
+      let presentDays = 0;
+      let halfDays = 0;
+
+      allRecords.forEach((att: Attendance) => {
+        if (att.total_hours) {
+          const [hours] = att.total_hours.split(':').map(Number);
+          if (hours >= 7) presentDays++;
+          else if (hours >= 4) halfDays++;
+        }
+      });
+
+      const absentDays = formData.total_working_days - presentDays - halfDays;
+
+      setFormData(prev => ({
+        ...prev,
+        present_days: presentDays,
+        half_days: halfDays,
+        absent_days: absentDays,
+        attendance: allRecords[0]?.id || ''
+      }));
     } catch (error) {
           }
   };
