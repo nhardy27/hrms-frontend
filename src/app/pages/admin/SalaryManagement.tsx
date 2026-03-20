@@ -93,6 +93,12 @@ interface SalaryForm {
   payment_status: string;
 }
 
+// working days per month
+const WORKING_DAYS: Record<number, number> = {
+  1: 22, 2: 18, 3: 22, 4: 20, 5: 20, 6: 21,
+  7: 21, 8: 20, 9: 20, 10: 21, 11: 20, 12: 21
+};
+
 // Array of month names for dropdown and display
 const MONTHS = [
   { value: 1, label: 'January' },
@@ -134,7 +140,7 @@ export function SalaryManagement() {
     basic_salary: '',
     hra: '',
     allowance: '',
-    total_working_days: 26,
+    total_working_days: WORKING_DAYS[new Date().getMonth() + 1],
     present_days: 0,
     absent_days: 0,
     half_days: 0,
@@ -153,7 +159,7 @@ export function SalaryManagement() {
   useEffect(() => {
     const user = localStorage.getItem('user');
     if (!user) {
-      navigate('/admin-dashboard');
+      navigate('/login');
       return;
     }
     
@@ -165,73 +171,75 @@ export function SalaryManagement() {
       return;
     }
     
-    // Load initial data
-    fetchEmployees();
-    fetchYears().then(() => {
-      // Set default year to 2026 after years are loaded
-      const year2026 = years.find(y => y.year === 2026);
-      if (year2026) {
-        setFormData(prev => ({ ...prev, year: year2026.id }));
-      }
+    // Load initial data sequentially so fetchSalaries has employees available
+    Promise.all([fetchEmployees(), fetchYears()]).then(([emps, yrs]) => {
+      fetchSalaries(emps ?? [], yrs ?? []);
     });
-    setTimeout(() => fetchSalaries(), 100); // Slight delay to ensure employees are loaded first
   }, []);
 
   // Effect runs when user, year, or month changes - fetches attendance data
+  // employees added as dependency so attendance fetch waits until employees are loaded
   useEffect(() => {
-    if (formData.user && formData.year && formData.month && !editingId) {
+    if (formData.user && formData.year && formData.month && !editingId && employees.length > 0) {
       fetchAttendanceForMonth();
       fetchEmployeeSalary();
     }
-  }, [formData.user, formData.year, formData.month]);
+  }, [formData.user, formData.year, formData.month, employees]);
 
   // Effect runs when salary components change - recalculates net salary
   useEffect(() => {
-    const absentDays = formData.total_working_days - formData.present_days - formData.half_days;
-    
-    const basic = parseFloat(formData.basic_salary) || 0;
-    const hra = parseFloat(formData.hra) || 0;
-    const allowance = parseFloat(formData.allowance) || 0;
-    const pfPercentage = parseFloat(formData.pf_percentage) || 0;
-    
-    // Gross Salary = Basic + HRA + Allowance
-    const grossSalary = basic + hra + allowance;
-    
-    // Per Day Salary
-    const perDaySalary = grossSalary / formData.total_working_days;
-    
-    // Unpaid Leave Deduction = Per Day × Absent Days
-    const unpaidLeaveDeduction = perDaySalary * absentDays;
-    
-    // Earned Salary = Gross - Unpaid Leave Deduction
-    const earnedSalary = grossSalary - unpaidLeaveDeduction;
-    
-    // PF Amount = (Basic / Total Days × (Present + Half×0.5)) × PF%
-    const perDayBasic = basic / formData.total_working_days;
-    const earnedBasic = (formData.present_days * perDayBasic) + (formData.half_days * perDayBasic * 0.5);
-    const pfAmount = (earnedBasic * pfPercentage) / 100;
-    
-    // Total Deduction = Unpaid Leave Deduction + PF
-    const totalDeduction = unpaidLeaveDeduction + pfAmount;
-    
-    // Net Salary = Earned Salary - PF Amount
-    const netSalary = earnedSalary - pfAmount;
-    
+    // FIX: parse all inputs once into stable numbers — prevents dep array churn
+    const basic       = parseFloat(formData.basic_salary) || 0;
+    const hra         = parseFloat(formData.hra)          || 0;
+    const allowance   = parseFloat(formData.allowance)    || 0;
+    const pfPct       = parseFloat(formData.pf_percentage)|| 0;
+    const workingDays = formData.total_working_days > 0 ? formData.total_working_days : 1;
+    const presentDays = formData.present_days;
+    const halfDays    = formData.half_days;
+
+    // FIX: helper rounds every intermediate value to 2dp immediately,
+    // eliminating floating-point accumulation across chained operations
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+
+    const grossSalary  = r2(basic + hra + allowance);
+    const perDaySalary = r2(grossSalary / workingDays);
+
+    // FIX: round paidDays to 1dp BEFORE deriving absentDays
+    // so absentDays never carries a 0.4999... float artifact
+    const paidDays  = r2(presentDays + halfDays * 0.5);
+    const absentDays = r2(Math.max(0, workingDays - paidDays));
+
+    // unpaidLeaveDeduction is for display only — it is NOT subtracted again in netSalary
+    // earnedSalary already excludes absent days via perDaySalary × paidDays
+    const unpaidLeaveDeduction = r2(perDaySalary * absentDays);
+    const earnedSalary         = r2(perDaySalary * paidDays);
+
+    // PF on prorated Earned Basic (not full basic), capped at ₹15,000
+    const earnedBasic = r2((basic / workingDays) * paidDays);
+    const pfAmount    = r2((Math.min(earnedBasic, 15000) * pfPct) / 100);
+
+    // FIX: totalDeduction = LOP + PF (display field, consistent with both deductions)
+    // netSalary = earnedSalary - PF only (LOP already excluded from earnedSalary)
+    const totalDeduction = r2(unpaidLeaveDeduction + pfAmount);
+    const netSalary      = presentDays === 0 && halfDays === 0
+      ? 0
+      : r2(Math.max(0, earnedSalary - pfAmount));
+
     setFormData(prev => ({
       ...prev,
-      absent_days: absentDays,
-      gross_salary: grossSalary.toFixed(2),
-      per_day_salary: perDaySalary.toFixed(2),
-      unpaid_leave_deduction: unpaidLeaveDeduction.toFixed(2),
-      earned_salary: earnedSalary.toFixed(2),
-      pf_amount: pfAmount.toFixed(2),
-      deduction: totalDeduction.toFixed(2),
-      net_salary: netSalary.toFixed(2)
+      absent_days:             absentDays,
+      gross_salary:            grossSalary.toFixed(2),
+      per_day_salary:          perDaySalary.toFixed(2),
+      unpaid_leave_deduction:  unpaidLeaveDeduction.toFixed(2),
+      earned_salary:           earnedSalary.toFixed(2),
+      pf_amount:               pfAmount.toFixed(2),
+      deduction:               totalDeduction.toFixed(2),
+      net_salary:              netSalary.toFixed(2)
     }));
   }, [formData.basic_salary, formData.hra, formData.allowance, formData.pf_percentage, formData.present_days, formData.half_days, formData.total_working_days]);
 
   // Function to fetch all salary records from API
-  const fetchSalaries = async () => {
+  const fetchSalaries = async (empList: Employee[] = employees, yearList: Year[] = years) => {
     try {
       let allRecords: any[] = [];
       let nextUrl = `${config.api.host}${config.api.salary}?page_size=100`;
@@ -249,7 +257,7 @@ export function SalaryManagement() {
       
       const records = allRecords.map((record: any) => {
         if (typeof record.user === 'number') {
-          const emp = employees.find(e => e.id === record.user);
+          const emp = empList.find(e => e.id === record.user);
           return {
             ...record,
             user: emp ? { id: emp.id, username: emp.username, email: emp.email } : null
@@ -257,8 +265,8 @@ export function SalaryManagement() {
         }
         return record;
       }).sort((a: SalaryRecord, b: SalaryRecord) => {
-        const yearA = years.find(y => y.id === a.year)?.year || 0;
-        const yearB = years.find(y => y.id === b.year)?.year || 0;
+        const yearA = yearList.find(y => y.id === a.year)?.year || 0;
+        const yearB = yearList.find(y => y.id === b.year)?.year || 0;
         if (yearB !== yearA) return yearB - yearA;
         return b.month - a.month;
       });
@@ -269,7 +277,7 @@ export function SalaryManagement() {
   };
 
   // Function to fetch all active employees (excluding admin)
-  const fetchEmployees = async () => {
+  const fetchEmployees = async (): Promise<Employee[]> => {
     try {
       let allEmployees: Employee[] = [];
       let nextUrl = `${config.api.host}${config.api.user}?is_active=true&page_size=100`;
@@ -280,34 +288,41 @@ export function SalaryManagement() {
           const data = await response.json();
           const emps = data.results.filter((emp: any) => emp.username !== 'admin');
           allEmployees = [...allEmployees, ...emps];
-          nextUrl = data.next; // Get next page URL
+          nextUrl = data.next;
         } else {
           break;
         }
       }
       
       setEmployees(allEmployees);
+      return allEmployees;
     } catch (error) {
-            toast.error("Failed to fetch employees");
+      toast.error("Failed to fetch employees");
+      return [];
     }
   };
 
   // Function to fetch available years from API
-  const fetchYears = async () => {
+  const fetchYears = async (): Promise<Year[]> => {
     try {
       const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.year}`);
       if (response.ok) {
         const data = await response.json();
-        setYears(data.results);
+        const results: Year[] = data.results;
+        setYears(results);
         
-        // Set default year to 2026
-        const year2026 = data.results.find((y: Year) => y.year === 2026);
-        if (year2026 && !formData.year) {
-          setFormData(prev => ({ ...prev, year: year2026.id }));
+        // Set default year to current year
+        const currentYear = new Date().getFullYear();
+        const matchedYear = results.find((y: Year) => y.year === currentYear) || results[results.length - 1];
+        if (matchedYear) {
+          setFormData(prev => ({ ...prev, year: matchedYear.id }));
         }
+        return results;
       }
+      return [];
     } catch (error) {
-            toast.error("Failed to fetch years");
+      toast.error("Failed to fetch years");
+      return [];
     }
   };
 
@@ -363,13 +378,11 @@ export function SalaryManagement() {
         }
       });
 
-      const absentDays = formData.total_working_days - presentDays - halfDays;
-
       setFormData(prev => ({
         ...prev,
         present_days: presentDays,
         half_days: halfDays,
-        absent_days: absentDays,
+        // absent_days is derived in the salary calculation useEffect from paidDays
         attendance: allRecords[0]?.id || ''
       }));
     } catch (error) {
@@ -429,7 +442,7 @@ export function SalaryManagement() {
       
       if (response.ok) {
         toast.success("Salary deleted successfully");
-        fetchSalaries(); // Refresh the list
+        fetchSalaries(employees, years); // Refresh the list
       } else {
         toast.error("Failed to delete salary");
       }
@@ -461,7 +474,7 @@ export function SalaryManagement() {
                   record.month === formData.month
       );
       if (existingSalary) {
-        toast.error("Salary already paid for this employee in the selected month");
+        toast.error("Salary record already exists for this employee in the selected month");
         return;
       }
     }
@@ -514,7 +527,7 @@ export function SalaryManagement() {
         if (salaryId) {
           try {
             const emailResponse = await makeAuthenticatedRequest(
-              `${config.api.host}${config.api.salary}${salaryData.id}/send_email/`,
+              `${config.api.host}${config.api.salary}${salaryId}/send_email/`,
               {
                 method: 'POST'
               }
@@ -530,6 +543,7 @@ export function SalaryManagement() {
           }
         }
         
+        setEditingId(null);
         setFormData({
           user: '',
           year: '',
@@ -538,7 +552,7 @@ export function SalaryManagement() {
           basic_salary: '',
           hra: '',
           allowance: '',
-          total_working_days: 26,
+          total_working_days: WORKING_DAYS[new Date().getMonth() + 1],
           present_days: 0,
           absent_days: 0,
           half_days: 0,
@@ -552,7 +566,7 @@ export function SalaryManagement() {
           net_salary: '0',
           payment_status: 'unpaid'
         });
-        fetchSalaries(); // Refresh salary list
+        fetchSalaries(employees, years); // Refresh salary list
       } else {
         const errorText = await response.text();
         let errorMsg = 'Failed to save salary';
@@ -587,6 +601,7 @@ export function SalaryManagement() {
                 className="btn btn-sm shadow-sm"
                 style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '6px' }}
                 onClick={() => {
+                  setEditingId(null);
                   setFormData({
                     user: '',
                     year: '',
@@ -595,7 +610,7 @@ export function SalaryManagement() {
                     basic_salary: '',
                     hra: '',
                     allowance: '',
-                    total_working_days: 26,
+                    total_working_days: WORKING_DAYS[new Date().getMonth() + 1],
                     present_days: 0,
                     absent_days: 0,
                     half_days: 0,
@@ -679,7 +694,7 @@ export function SalaryManagement() {
                       <select
                         className="form-select shadow-sm"
                         value={formData.month}
-                        onChange={(e) => setFormData({ ...formData, month: parseInt(e.target.value) })}
+                        onChange={(e) => { const m = parseInt(e.target.value); setFormData({ ...formData, month: m, total_working_days: WORKING_DAYS[m] }); }}
                         required
                         style={{borderRadius: '8px', padding: '10px', border: '1px solid #dee2e6', background: '#ffffff'}}
                       >
@@ -781,14 +796,8 @@ export function SalaryManagement() {
                         type="number"
                         className="form-control shadow-sm"
                         value={formData.total_working_days}
-                        onChange={(e) => {
-                          const value = parseInt(e.target.value) || 0;
-                          const clampedValue = Math.max(1, Math.min(31, value));
-                          setFormData({ ...formData, total_working_days: clampedValue });
-                        }}
-                        min="1"
-                        max="31"
-                        style={{borderRadius: '8px', padding: '10px', border: '1px solid #17a2b8', background: '#ffffff'}}
+                        readOnly
+                        style={{borderRadius: '8px', padding: '10px', background: '#f8f9fa'}}
                       />
                     </div>
 
@@ -819,12 +828,12 @@ export function SalaryManagement() {
                       <input
                         type="number"
                         className="form-control shadow-sm"
-                        value={formData.absent_days}
+                        value={formData.absent_days % 1 === 0 ? formData.absent_days : formData.absent_days.toFixed(1)}
                         readOnly
                         style={{borderRadius: '8px', padding: '10px', background: '#f8f9fa'}}
                       />
                     </div>
-                  </div>
+                    </div>
                 </div>
               </div>
 
@@ -1087,18 +1096,3 @@ export function SalaryManagement() {
 
 
 
-
-// Gross Salary = Basic + HRA + Allowance
-// Per Day Salary = Gross Salary / Total Working Days
-// Earned Salary = Per Day Salary × Present Days
-// Unpaid Leave Deduction = Per Day Salary × Absent Days
-
-
-// pf 
-// Basic per day = 10000 / 26 = 384.61
-// 2 din ka basic = 384.61 × 2 = 769.23
-// PF = 12% of 769.23 = 92.30 
-
-// Total Deduction = Unpaid Leave Deduction + PF
-
-// Net Salary = Earned Salary - PF
