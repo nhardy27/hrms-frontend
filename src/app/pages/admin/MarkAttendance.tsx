@@ -122,13 +122,19 @@ export function MarkAttendance() {
       setTotalCount(allData.length);
       setTotalPages(Math.ceil(allData.length / itemsPerPage));
       
-      const attendanceUrl = `${config.api.host}${config.api.attendance}?date=${selectedDate}`;
-      const attResponse = await makeAuthenticatedRequest(attendanceUrl);
-      
-      if (attResponse.ok) {
-        const attData = await attResponse.json();
-        setExistingAttendance(attData.results || []);
+      let allAttendance: AttendanceData[] = [];
+      let attUrl: string | null = `${config.api.host}${config.api.attendance}?date=${selectedDate}&page_size=100`;
+      while (attUrl) {
+        const attResponse = await makeAuthenticatedRequest(attUrl);
+        if (attResponse.ok) {
+          const attData = await attResponse.json();
+          allAttendance = [...allAttendance, ...(attData.results || [])];
+          attUrl = attData.next;
+        } else {
+          break;
+        }
       }
+      setExistingAttendance(allAttendance);
     } catch (error) {
       toast.error('Failed to load attendance data');
     } finally {

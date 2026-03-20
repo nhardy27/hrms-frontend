@@ -7,8 +7,11 @@ interface AttendanceTabProps {
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
+const PAGE_SIZE = 10;
+
 export function AttendanceTab({ attendances }: AttendanceTabProps) {
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
   // Get current logged-in user with error handling
   const getCurrentUser = () => {
     try {
@@ -28,6 +31,7 @@ export function AttendanceTab({ attendances }: AttendanceTabProps) {
     return att.user?.toString() === currentUserId;
   });
   
+  // Reset to page 1 when month filter changes — handled via key on select
   // Filter by selected month if any
   if (selectedMonth !== 'all') {
     userAttendances = userAttendances.filter(att => {
@@ -65,7 +69,7 @@ export function AttendanceTab({ attendances }: AttendanceTabProps) {
           <select 
             className="form-select" 
             value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
+            onChange={(e) => { setSelectedMonth(e.target.value); setCurrentPage(1); }}
             style={{ maxWidth: '250px' }}
           >
             <option value="all">All Months</option>
@@ -86,7 +90,9 @@ export function AttendanceTab({ attendances }: AttendanceTabProps) {
                 </tr>
               </thead>
               <tbody>
-                {uniqueAttendances.map((att) => {
+                {uniqueAttendances
+                  .slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+                  .map((att) => {
                   // Use total_hours from API if available, otherwise calculate
                   let totalHours = 'N/A';
                   if (att.total_hours) {
@@ -116,6 +122,28 @@ export function AttendanceTab({ attendances }: AttendanceTabProps) {
               }
               </tbody>
             </table>
+
+            {/* Pagination */}
+            {uniqueAttendances.length > PAGE_SIZE && (
+              <div className="d-flex justify-content-between align-items-center mt-3">
+                <small className="text-muted">
+                  Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, uniqueAttendances.length)} of {uniqueAttendances.length}
+                </small>
+                <ul className="pagination pagination-sm mb-0">
+                  <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                    <button className="page-link" onClick={() => setCurrentPage(p => p - 1)}>Previous</button>
+                  </li>
+                  {Array.from({ length: Math.ceil(uniqueAttendances.length / PAGE_SIZE) }, (_, i) => i + 1).map(page => (
+                    <li key={page} className={`page-item ${currentPage === page ? 'active' : ''}`}>
+                      <button className="page-link" onClick={() => setCurrentPage(page)}>{page}</button>
+                    </li>
+                  ))}
+                  <li className={`page-item ${currentPage >= Math.ceil(uniqueAttendances.length / PAGE_SIZE) ? 'disabled' : ''}`}>
+                    <button className="page-link" onClick={() => setCurrentPage(p => p + 1)}>Next</button>
+                  </li>
+                </ul>
+              </div>
+            )}
           </div>
         ) : (
           <p className="text-muted">No attendance records found.</p>
