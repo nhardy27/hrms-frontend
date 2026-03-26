@@ -49,26 +49,16 @@ export function EmployeeList() {
   const itemsPerPage = 10;
 
   useEffect(() => {
-    const initializeData = async () => {
-      await fetchDepartments();
-    };
-    initializeData();
-    
-    const handleFocus = async () => {
-      await fetchDepartments();
-      await fetchEmployees();
-    };
+    fetchDepartments();
     
     const handleDepartmentChange = async () => {
       await fetchDepartments();
       await fetchEmployees();
     };
     
-    window.addEventListener('focus', handleFocus);
     window.addEventListener('departmentChanged', handleDepartmentChange);
     
     return () => {
-      window.removeEventListener('focus', handleFocus);
       window.removeEventListener('departmentChanged', handleDepartmentChange);
     };
   }, []);

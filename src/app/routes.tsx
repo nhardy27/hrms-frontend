@@ -3,6 +3,7 @@ import {
   AdminDashboard, 
   MarkAttendance,
   DepartmentManagement,
+  DesignationManagement,
   EmployeeForm,
   EmployeeList,
   LeaveManagement,
@@ -52,6 +53,10 @@ export const router = createBrowserRouter([
   {
     path: "/departments",
     Component: DepartmentManagement,
+  },
+  {
+    path: "/designations",
+    Component: DesignationManagement,
   },
   {
     path: "/employee-dashboard",

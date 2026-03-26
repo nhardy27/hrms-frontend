@@ -17,6 +17,7 @@ export function AdminLayout({ children, title = 'Admin Dashboard' }: AdminLayout
     { path: '/admin-dashboard', icon: 'bi-speedometer2', label: 'Dashboard' },
     { path: '/employees', icon: 'bi-people', label: 'Employees' },
     { path: '/departments', icon: 'bi-building', label: 'Departments' },
+    { path: '/designations', icon: 'bi-briefcase', label: 'Designations' },
     { path: '/mark-attendance', icon: 'bi-calendar-check', label: 'Mark Attendance' },
     { path: '/leave-management', icon: 'bi-calendar-x', label: 'Leave Management' },
     { path: '/salary-management', icon: 'bi-cash-coin', label: 'Salary Management' },
@@ -28,7 +29,7 @@ export function AdminLayout({ children, title = 'Admin Dashboard' }: AdminLayout
   };
 
   return (
-    <div className="min-vh-100 d-flex" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>
       {/* Mobile Overlay */}
       {mobileMenuOpen && (
         <div 
@@ -43,15 +44,17 @@ export function AdminLayout({ children, title = 'Admin Dashboard' }: AdminLayout
         className={`${mobileMenuOpen ? 'd-block' : 'd-none'} d-md-block`} 
         style={{
           width: sidebarCollapsed ? '80px' : '260px',
-          transition: 'all 0.3s',
-          position: 'fixed',
+          minWidth: sidebarCollapsed ? '80px' : '260px',
+          transition: 'width 0.3s, min-width 0.3s',
           height: '100vh',
+          position: 'sticky',
+          top: 0,
+          alignSelf: 'flex-start',
           overflowY: 'auto',
           zIndex: 1000,
           background: '#ffffff',
           borderRight: '1px solid #e9ecef',
-          left: 0,
-          top: 0
+          flexShrink: 0
         }}
       >
         <div className="p-3 d-flex justify-content-between align-items-center" style={{ borderBottom: '1px solid #e9ecef' }}>
@@ -126,13 +129,11 @@ export function AdminLayout({ children, title = 'Admin Dashboard' }: AdminLayout
 
       {/* Main Content */}
       <div 
-        className="flex-grow-1" 
         style={{ 
-          marginLeft: window.innerWidth >= 768 ? (sidebarCollapsed ? '80px' : '260px') : '0',
-          transition: 'margin-left 0.3s',
-          width: '100%',
-          maxWidth: '100vw',
-          overflowX: 'hidden'
+          flex: 1,
+          minWidth: 0,
+          overflow: 'hidden',
+          transition: 'all 0.3s',
         }}
       >
         <nav className="navbar navbar-expand-lg shadow-sm" style={{ background: '#ffffff', borderBottom: '1px solid #e9ecef' }}>

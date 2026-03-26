@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import toast, { Toaster } from 'react-hot-toast';
 import config from "../../../config/global.json";
+import { makeAuthenticatedRequest, fetchAllPages } from "../../../utils/apiUtils";
 import { AdminLayout } from '../../components/AdminLayout';
 
 interface Department {
@@ -10,14 +11,25 @@ interface Department {
   status: boolean;
 }
 
+interface Designation {
+  id: string;
+  name: string;
+  department: string;
+  status: boolean;
+}
+
 export function EmployeeForm() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = !!id;
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [designations, setDesignations] = useState<Designation[]>([]);
   const [loading, setLoading] = useState(false);
   const [usernameError, setUsernameError] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  const [bankAccountError, setBankAccountError] = useState('');
+  const [ifscError, setIfscError] = useState('');
+  const [bankNameError, setBankNameError] = useState('');
   const [debounceTimer, setDebounceTimer] = useState<number | null>(null);
   const [employeeRoleId, setEmployeeRoleId] = useState<number | null>(null);
 
@@ -42,96 +54,6 @@ export function EmployeeForm() {
     hra: "",
     allowance: "",
   });
-
-  const refreshToken = async () => {
-    const refresh = localStorage.getItem('refreshToken');
-    if (!refresh) return null;
-
-    try {
-      const response = await fetch(`${config.api.host}${config.api.refreshToken}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem('token', data.access);
-        return data.access;
-      }
-    } catch (error) {
-      // Error refreshing token
-    }
-    return null;
-  };
-
-  const getToken = async () => {
-    const username = localStorage.getItem('username');
-    const password = localStorage.getItem('password');
-    
-    if (!username || !password) {
-      // No login credentials found
-      navigate('/login');
-      return null;
-    }
-
-    try {
-      const response = await fetch(`${config.api.host}${config.api.token}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem('token', data.access);
-        if (data.refresh) {
-          localStorage.setItem('refreshToken', data.refresh);
-        }
-        return data.access;
-      } else {
-        // Failed to get token
-        navigate('/login');
-      }
-    } catch (error) {
-      // Error getting token
-      navigate('/login');
-    }
-    return null;
-  };
-
-  const makeAuthenticatedRequest = async (url: string, options: RequestInit = {}) => {
-    let token = localStorage.getItem('token');
-    
-    // If no token, try to get a new one
-    if (!token) {
-      token = await refreshToken() || await getToken();
-      if (!token) {
-        return new Response(JSON.stringify({error: 'Authentication failed'}), {status: 401});
-      }
-    }
-
-    const headers = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      ...options.headers
-    };
-
-    let response = await fetch(url, { ...options, headers });
-    
-    // If token is invalid, try to refresh and retry once
-    if (response.status === 401) {
-      localStorage.removeItem('token'); // Clear invalid token
-      
-      token = await refreshToken() || await getToken();
-      if (token) {
-        response = await fetch(url, {
-          ...options,
-          headers: { ...headers, 'Authorization': `Bearer ${token}` }
-        });
-      }
-    }
-    
-    return response;
-  };
 
   const generateEmployeeCode = async () => {
     try {
@@ -193,24 +115,19 @@ export function EmployeeForm() {
     }
   };
 
+  const fetchDesignationsByDepartment = async (departmentId: string) => {
+    if (!departmentId) { setDesignations([]); return; }
+    try {
+      const all = await fetchAllPages(`${config.api.host}${config.api.designation}`);
+      setDesignations(all.filter((d: Designation) => String(d.department) === String(departmentId) && d.status !== false));
+    } catch {}
+  };
+
   const fetchDepartments = async () => {
     try {
-      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.department}?status=true`);
-      if (response.ok) {
-        const data = await response.json();
-        const activeDepts = data.results || data || [];
-        setDepartments(activeDepts);
-        
-        if (isEdit && formData.department) {
-          const deptExists = activeDepts.find((d: Department) => d.id === formData.department);
-          if (!deptExists && formData.department) {
-            setFormData(prev => ({ ...prev, department: '' }));
-          }
-        }
-      }
-    } catch (error) {
-      // Error fetching departments
-    }
+      const activeDepts = await fetchAllPages(`${config.api.host}${config.api.department}`);
+      setDepartments(activeDepts.filter((d: Department) => d.status));
+    } catch (error) {}
   };
 
   const fetchEmployee = async () => {
@@ -240,6 +157,7 @@ export function EmployeeForm() {
           hra: employee.hra || "",
           allowance: employee.allowance || "",
         });
+        if (employee.department) fetchDesignationsByDepartment(employee.department);
       }
     } catch (error) {
       // Error fetching employee
@@ -291,9 +209,44 @@ export function EmployeeForm() {
     }
   };
 
+  const handleBankAccountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setFormData(prev => ({ ...prev, bank_account_number: value }));
+    if (value && !/^[0-9]{9,18}$/.test(value)) {
+      setBankAccountError('Account number must be 9–18 digits');
+    } else {
+      setBankAccountError('');
+    }
+  };
+
+  const handleIfscChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.toUpperCase();
+    setFormData(prev => ({ ...prev, ifsc_code: value }));
+    if (value && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(value)) {
+      setIfscError('Invalid IFSC (e.g. SBIN0001234)');
+    } else {
+      setIfscError('');
+    }
+  };
+
+  const handleBankNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setFormData(prev => ({ ...prev, bank_name: value }));
+    if (value && !/^[a-zA-Z ]{2,}$/.test(value)) {
+      setBankNameError('Bank name must contain only letters');
+    } else {
+      setBankNameError('');
+    }
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     
+    if (name === 'department') {
+      setFormData((prev) => ({ ...prev, department: value, designation: '' }));
+      fetchDesignationsByDepartment(value);
+      return;
+    }
     if (name === 'basic_salary') {
       const basicSalary = parseFloat(value) || 0;
       const hra = Math.round(basicSalary * 0.4); // 40% of basic salary
@@ -320,9 +273,20 @@ export function EmployeeForm() {
       toast.error('Please fix the username error before submitting');
       return;
     }
-    
     if (phoneError) {
       toast.error('Please fix the phone number error before submitting');
+      return;
+    }
+    if (bankAccountError) {
+      toast.error('Please fix the bank account number error before submitting');
+      return;
+    }
+    if (ifscError) {
+      toast.error('Please fix the IFSC code error before submitting');
+      return;
+    }
+    if (bankNameError) {
+      toast.error('Please fix the bank name error before submitting');
       return;
     }
     
@@ -566,15 +530,20 @@ export function EmployeeForm() {
                 <label htmlFor="designation" className="form-label">
                   Designation <span className="text-danger">*</span>
                 </label>
-                <input
-                  type="text"
-                  className="form-control"
+                <select
+                  className="form-select"
                   id="designation"
                   name="designation"
                   value={formData.designation}
                   onChange={handleChange}
                   required
-                />
+                  disabled={!formData.department}
+                >
+                  <option value="">{formData.department ? 'Select Designation' : 'Select Department first'}</option>
+                  {designations.map((desig) => (
+                    <option key={desig.id} value={desig.id}>{desig.name}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="col-md-6">
@@ -643,48 +612,47 @@ export function EmployeeForm() {
               </div>
 
               <div className="col-md-4">
-                <label htmlFor="bank_name" className="form-label">
-                  Bank Name
-                </label>
+                <label htmlFor="bank_name" className="form-label">Bank Name</label>
                 <input
                   type="text"
-                  className="form-control"
+                  className={`form-control ${bankNameError ? 'is-invalid' : ''}`}
                   id="bank_name"
                   name="bank_name"
                   value={formData.bank_name}
-                  onChange={handleChange}
-                  placeholder="Enter bank name"
+                  onChange={handleBankNameChange}
+                  placeholder="e.g. State Bank of India"
                 />
+                {bankNameError && <div className="invalid-feedback">{bankNameError}</div>}
               </div>
 
               <div className="col-md-4">
-                <label htmlFor="bank_account_number" className="form-label">
-                  Bank Account Number
-                </label>
+                <label htmlFor="bank_account_number" className="form-label">Bank Account Number</label>
                 <input
                   type="text"
-                  className="form-control"
+                  className={`form-control ${bankAccountError ? 'is-invalid' : ''}`}
                   id="bank_account_number"
                   name="bank_account_number"
                   value={formData.bank_account_number}
-                  onChange={handleChange}
-                  placeholder="Enter account number"
+                  onChange={handleBankAccountChange}
+                  placeholder="9–18 digit account number"
+                  maxLength={18}
                 />
+                {bankAccountError && <div className="invalid-feedback">{bankAccountError}</div>}
               </div>
 
               <div className="col-md-4">
-                <label htmlFor="ifsc_code" className="form-label">
-                  IFSC Code
-                </label>
+                <label htmlFor="ifsc_code" className="form-label">IFSC Code</label>
                 <input
                   type="text"
-                  className="form-control"
+                  className={`form-control ${ifscError ? 'is-invalid' : ''}`}
                   id="ifsc_code"
                   name="ifsc_code"
                   value={formData.ifsc_code}
-                  onChange={handleChange}
-                  placeholder="Enter IFSC code"
+                  onChange={handleIfscChange}
+                  placeholder="e.g. SBIN0001234"
+                  maxLength={11}
                 />
+                {ifscError && <div className="invalid-feedback">{ifscError}</div>}
               </div>
 
               <div className="col-md-4">

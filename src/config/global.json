@@ -2,12 +2,13 @@
 {
   "api": {
     "host_": "http://192.168.1.15:8000",
-    "host": "https://2pdxz2xv-8002.inc1.devtunnels.ms", 
+    "host": "https://2pdxz2xv-8000.inc1.devtunnels.ms", 
     "token": "/auth/token/",
     "path": "/api/v1",
     "refreshToken": "/auth/token/refresh/",
     "user": "/api/v1/user/",
     "department": "/api/v1/department/",
+    "designation": "/api/v1/designation/",
     "employee": "/api/v1/user/",  
     "attendance": "/api/v1/attendance/",
     "attendanceStatus": "/api/v1/attendanceStatus/",

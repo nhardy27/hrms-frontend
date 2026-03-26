@@ -1,6 +1,7 @@
 export { AdminDashboard } from './Dashboard';
 export { MarkAttendance } from './MarkAttendance';
 export { DepartmentPage as DepartmentManagement } from './DepartmentManagement';
+export { DesignationPage as DesignationManagement } from './DesignationManagement';
 export { EmployeeForm } from './EmployeeForm';
 export { EmployeeList } from './EmployeeList';
 export { LeaveManagement } from './LeaveManagement';

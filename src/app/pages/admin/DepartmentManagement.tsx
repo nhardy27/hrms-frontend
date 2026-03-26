@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import toast, { Toaster } from 'react-hot-toast';
 import config from "../../../config/global.json";
+import { makeAuthenticatedRequest, fetchAllPages } from "../../../utils/apiUtils";
 import { AdminLayout } from '../../components/AdminLayout';
 
 interface Department {
@@ -13,6 +14,8 @@ interface Department {
 
 export function DepartmentPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 5;
   const [showForm, setShowForm] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
   const [loading, setLoading] = useState(false);
@@ -23,93 +26,17 @@ export function DepartmentPage() {
 
   const apiUrl = `${config.api.host}${config.api.department}`;
 
-  const refreshToken = async () => {
-    const refresh = localStorage.getItem('refreshToken');
-    if (!refresh) return null;
-
-    try {
-      const response = await fetch(`${config.api.host}${config.api.refreshToken}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem('token', data.access);
-        return data.access;
-      }
-    } catch (error) {
-          }
-    return null;
-  };
-
-  const getToken = async () => {
-    const username = localStorage.getItem('username');
-    const password = localStorage.getItem('password');
-    
-    if (!username || !password) {
-            return null;
-    }
-
-    try {
-      const response = await fetch(`${config.api.host}${config.api.token}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem('token', data.access);
-        if (data.refresh) {
-          localStorage.setItem('refreshToken', data.refresh);
-        }
-        return data.access;
-      }
-    } catch (error) {
-          }
-    return null;
-  };
-
-  const makeAuthenticatedRequest = async (url: string, options: RequestInit = {}) => {
-    let token = localStorage.getItem('token');
-    if (!token) {
-      token = await refreshToken() || await getToken();
-    }
-
-    const headers = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      ...options.headers
-    };
-
-    let response = await fetch(url, { ...options, headers });
-    
-    if (response.status === 401) {
-      token = await refreshToken() || await getToken();
-      if (token) {
-        response = await fetch(url, {
-          ...options,
-          headers: { ...headers, 'Authorization': `Bearer ${token}` }
-        });
-      }
-    }
-    
-    return response;
-  };
-
   useEffect(() => {
     fetchDepartments();
+    const interval = setInterval(fetchDepartments, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchDepartments = async () => {
     try {
-      const response = await makeAuthenticatedRequest(apiUrl);
-      if (response.ok) {
-        const data = await response.json();
-        setDepartments(data.results || []);
-      }
-    } catch (error) {
-          }
+      const data = await fetchAllPages(apiUrl);
+      setDepartments(data);
+    } catch (error) {}
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -257,12 +184,11 @@ export function DepartmentPage() {
                     <th>Department Name</th>
                     <th>Status</th>
                     <th>Created</th>
-                    <th>Updated</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {Array.isArray(departments) && departments.map((department) => (
+                  {Array.isArray(departments) && departments.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((department) => (
                     <tr key={department.id}>
                       <td className="fw-semibold">{department.name}</td>
                       <td>
@@ -271,7 +197,6 @@ export function DepartmentPage() {
                         </span>
                       </td>
                       <td>{new Date(department.created_at).toLocaleDateString()}</td>
-                      <td>{new Date(department.updated_at).toLocaleDateString()}</td>
                       <td>
                         <button 
                           className="btn btn-sm shadow-sm me-2"
@@ -293,6 +218,24 @@ export function DepartmentPage() {
                 </tbody>
               </table>
             </div>
+            {departments.length > pageSize && (
+              <div className="d-flex justify-content-between align-items-center px-2 pt-3">
+                <small className="text-muted">Showing {Math.min((currentPage - 1) * pageSize + 1, departments.length)}–{Math.min(currentPage * pageSize, departments.length)} of {departments.length}</small>
+                <ul className="pagination pagination-sm mb-0">
+                  <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                    <button className="page-link" onClick={() => setCurrentPage(p => p - 1)}>‹</button>
+                  </li>
+                  {Array.from({ length: Math.ceil(departments.length / pageSize) }, (_, i) => (
+                    <li key={i + 1} className={`page-item ${currentPage === i + 1 ? 'active' : ''}`}>
+                      <button className="page-link" style={currentPage === i + 1 ? { background: '#2c3e50', borderColor: '#2c3e50' } : {}} onClick={() => setCurrentPage(i + 1)}>{i + 1}</button>
+                    </li>
+                  ))}
+                  <li className={`page-item ${currentPage === Math.ceil(departments.length / pageSize) ? 'disabled' : ''}`}>
+                    <button className="page-link" onClick={() => setCurrentPage(p => p + 1)}>›</button>
+                  </li>
+                </ul>
+              </div>
+            )}
           </div>
         </div>
       </div>
