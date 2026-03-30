@@ -358,7 +358,6 @@ export function MarkAttendance() {
                 <table className="table table-hover" style={{ minWidth: '1200px' }}>
                   <thead>
                     <tr>
-                      <th>ID</th>
                       <th>Employee Code</th>
                       <th>Name</th>
                       <th>Department</th>
@@ -416,7 +415,6 @@ export function MarkAttendance() {
                       
                       return (
                         <tr key={emp.id}>
-                          <td><strong>{emp.id}</strong></td>
                           <td><strong>{emp.emp_code}</strong></td>
                           <td><strong>{emp.first_name} {emp.last_name}</strong></td>
                           <td><span className="badge bg-secondary">{emp.department_name}</span></td>

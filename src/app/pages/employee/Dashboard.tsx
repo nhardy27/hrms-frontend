@@ -58,17 +58,31 @@ export function EmployeeDashboard() {
       const currentUserId = userData.id;
       
       // Single API call to get all data
-      const [userRes, attRes, attStatusRes, leaveRes] = await Promise.all([
+      const [userRes, attRes, attStatusRes, leaveRes, designationRes] = await Promise.all([
         makeAuthenticatedRequest(`${config.api.host}${config.api.user}`),
         makeAuthenticatedRequest(`${config.api.host}${config.api.attendance}`),
         makeAuthenticatedRequest(`${config.api.host}${config.api.attendanceStatus}`),
-        makeAuthenticatedRequest(`${config.api.host}${config.api.leave}`)
+        makeAuthenticatedRequest(`${config.api.host}${config.api.leave}`),
+        makeAuthenticatedRequest(`${config.api.host}${config.api.designation}`)
       ]);
+
+      // Build designation id -> name map
+      let designationMap: Record<number, string> = {};
+      if (designationRes.ok) {
+        const desigData = await designationRes.json();
+        (desigData.results || []).forEach((d: any) => {
+          designationMap[d.id] = d.name || d.designation_name || d.title || String(d.id);
+        });
+      }
       
       // Process user data
       if (userRes.ok) {
         const usersData = await userRes.json();
         const apiUserData = (usersData.results || []).find((u: any) => u.id === currentUserId);
+        const designationId = apiUserData?.designation;
+        const designationName = designationId
+          ? (designationMap[designationId] || String(designationId))
+          : 'N/A';
         
         setEmployee({
           id: (apiUserData?.id || currentUserId).toString(),
@@ -78,7 +92,7 @@ export function EmployeeDashboard() {
           email: apiUserData?.email || userData.email || 'N/A',
           username: apiUserData?.username || userData.username || 'N/A',
           department_name: apiUserData?.department_name || 'N/A',
-          designation: apiUserData?.designation || 'N/A',
+          designation: designationName,
           contact_no: apiUserData?.contact_no || 'N/A',
           date_of_joining: apiUserData?.date_of_joining || 'N/A'
         });

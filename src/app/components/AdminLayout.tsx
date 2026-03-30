@@ -44,17 +44,15 @@ export function AdminLayout({ children, title = 'Admin Dashboard' }: AdminLayout
         className={`${mobileMenuOpen ? 'd-block' : 'd-none'} d-md-block`} 
         style={{
           width: sidebarCollapsed ? '80px' : '260px',
-          minWidth: sidebarCollapsed ? '80px' : '260px',
-          transition: 'width 0.3s, min-width 0.3s',
           height: '100vh',
-          position: 'sticky',
+          position: 'fixed',
           top: 0,
-          alignSelf: 'flex-start',
+          left: 0,
           overflowY: 'auto',
           zIndex: 1000,
           background: '#ffffff',
           borderRight: '1px solid #e9ecef',
-          flexShrink: 0
+          transition: 'width 0.3s',
         }}
       >
         <div className="p-3 d-flex justify-content-between align-items-center" style={{ borderBottom: '1px solid #e9ecef' }}>
@@ -130,10 +128,11 @@ export function AdminLayout({ children, title = 'Admin Dashboard' }: AdminLayout
       {/* Main Content */}
       <div 
         style={{ 
-          flex: 1,
+          marginLeft: sidebarCollapsed ? '80px' : '260px',
           minWidth: 0,
-          overflow: 'hidden',
-          transition: 'all 0.3s',
+          flex: 1,
+          transition: 'margin-left 0.3s',
+          minHeight: '100vh',
         }}
       >
         <nav className="navbar navbar-expand-lg shadow-sm" style={{ background: '#ffffff', borderBottom: '1px solid #e9ecef' }}>

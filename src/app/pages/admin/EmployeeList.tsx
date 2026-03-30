@@ -226,7 +226,6 @@ export function EmployeeList() {
               <table className="table table-hover align-middle" style={{ minWidth: '1800px' }}>
                 <thead>
                   <tr>
-                    <th style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>ID</th>
                     <th style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Employee Code</th>
                     <th style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Name</th>
                     <th style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Email</th>
@@ -247,7 +246,6 @@ export function EmployeeList() {
                     .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                     .map((employee) => (
                       <tr key={employee.id}>
-                        <td style={{ verticalAlign: 'middle' }}><strong>{employee.id}</strong></td>
                         <td style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>{employee.emp_code || `EMP${employee.id.toString().padStart(3, '0')}`}</td>
                         <td style={{ verticalAlign: 'middle', whiteSpace: 'nowrap' }}>{`${employee.first_name} ${employee.last_name}`}</td>
                         <td style={{ verticalAlign: 'middle' }}>{employee.email}</td>

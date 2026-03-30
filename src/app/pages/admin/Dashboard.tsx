@@ -1,358 +1,227 @@
-// React hooks for state management and side effects
 import { useState, useEffect } from "react";
-// Router hooks for navigation and routing
 import { useNavigate } from "react-router-dom";
-// Toast notifications for user feedback
 import toast, { Toaster } from "react-hot-toast";
-// API configuration
 import config from "../../../config/global.json";
-// Utility function for authenticated API calls
 import { makeAuthenticatedRequest } from "../../../utils/apiUtils";
-// Reusable Admin Layout component
 import { AdminLayout } from "../../components/AdminLayout";
 import { LoadingAnimation } from "../../components/LoadingAnimation";
 
+const STAT_CARDS = (stats: ReturnType<typeof defaultStats>) => [
+  { title: "Total Departments", value: stats.totalDepartments, icon: "bi-building",        color: "#3498db", link: "/departments" },
+  { title: "Total Employees",   value: stats.totalEmployees,   icon: "bi-people",           color: "#9b59b6", link: "/employees" },
+  { title: "Present Today",     value: stats.presentToday,     icon: "bi-person-check",     color: "#2ecc71", link: "/mark-attendance" },
+  { title: "Pending Leaves",    value: stats.pendingLeaves,    icon: "bi-calendar-x",       color: "#e74c3c", link: "/leave-management" },
+  { title: "Paid Salaries",     value: stats.paidSalaries,     icon: "bi-cash-coin",        color: "#27ae60", link: "/salary-management" },
+  { title: "Unpaid Salaries",   value: stats.unpaidSalaries,   icon: "bi-exclamation-triangle", color: "#f39c12", link: "/salary-management" },
+];
+
+const QUICK_ACTIONS = [
+  { label: "Add Employee",     icon: "bi-person-plus",      link: "/employees/add",     color: "#9b59b6" },
+  { label: "Mark Attendance",  icon: "bi-calendar-check",   link: "/mark-attendance",   color: "#2ecc71" },
+  { label: "Manage Leaves",    icon: "bi-calendar-x",       link: "/leave-management",  color: "#e74c3c" },
+  { label: "Run Payroll",      icon: "bi-cash-stack",       link: "/salary-management", color: "#27ae60" },
+];
+
+function defaultStats() {
+  return { totalEmployees: 0, totalDepartments: 0, presentToday: 0, pendingLeaves: 0, paidSalaries: 0, unpaidSalaries: 0 };
+}
+
 export function AdminDashboard() {
-  // Hook to programmatically navigate between routes
   const navigate = useNavigate();
-
-  // State to store dashboard statistics from API
-  const [stats, setStats] = useState({ 
-    totalEmployees: 0, 
-    totalDepartments: 0,
-    presentToday: 0,
-    pendingLeaves: 0,
-    paidSalaries: 0,
-    unpaidSalaries: 0
-  });
-
-  // Loading state for data fetching
+  const [stats, setStats] = useState(defaultStats());
   const [loading, setLoading] = useState(true);
 
-  /* ============================
-      AUTH + ADMIN CHECK
-     ============================ */
-  // Effect runs on component mount to verify authentication and admin access
   useEffect(() => {
-    // Get user data from localStorage
     const user = localStorage.getItem("user");
-
-    // If no user found, redirect to login
-    if (!user) {
-      navigate("/login");
-      return;
-    }
-
+    if (!user) { navigate("/login"); return; }
     try {
-      // Parse user data from JSON string
       const userData = JSON.parse(user);
-
-      // Check if user has admin privileges
-      const isAdmin =
-        userData.is_superuser === true ||
-        (userData.is_staff === true && userData.username === "admin");
-
-      // If not admin, show error and redirect to employee dashboard
-      if (!isAdmin) {
-        toast.error("Access denied. Only admin users can access this page.");
-        navigate("/employee-dashboard");
-        return;
-      }
-
-      // If admin, fetch dashboard statistics
+      const isAdmin = userData.is_superuser === true || (userData.is_staff === true && userData.username === "admin");
+      if (!isAdmin) { toast.error("Access denied."); navigate("/employee-dashboard"); return; }
       fetchDashboardStats();
-    } catch (error) {
-            navigate("/login");
-    }
+    } catch { navigate("/login"); }
   }, [navigate]);
 
-  // Function to fetch dashboard statistics from API
   const fetchDashboardStats = async () => {
     setLoading(true);
-
     try {
-      // Make authenticated API request to get dashboard data
-      const response = await makeAuthenticatedRequest(
-        `${config.api.host}${config.api.adminDashboard}`
-      );
-
+      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.adminDashboard}`);
       if (response.ok) {
-        // Parse response and update stats state
         const data = await response.json();
         setStats({
-          totalEmployees: data.total_employees || 0,
-          totalDepartments: data.total_departments || 0,
-          presentToday: data.present_today || 0,
-          pendingLeaves: data.pending_leaves || 0,
-          paidSalaries: data.total_paid_salaries || 0,
-          unpaidSalaries: data.total_unpaid_salaries || 0
+          totalEmployees:   data.total_employees       || 0,
+          totalDepartments: data.total_departments     || 0,
+          presentToday:     data.present_today         || 0,
+          pendingLeaves:    data.pending_leaves        || 0,
+          paidSalaries:     data.total_paid_salaries   || 0,
+          unpaidSalaries:   data.total_unpaid_salaries || 0,
         });
-      } else {
-        toast.error("Failed to load dashboard data");
-      }
-    } catch (error) {
-            toast.error("Failed to load dashboard data");
-    } finally {
-      // Always set loading to false when done
-      setLoading(false);
-    }
+      } else { toast.error("Failed to load dashboard data"); }
+    } catch { toast.error("Failed to load dashboard data"); }
+    finally { setLoading(false); }
   };
 
-  // Calculate attendance percentage based on present employees
-  const attendancePercentage =
-    stats.totalEmployees > 0
-      ? Math.round((stats.presentToday / stats.totalEmployees) * 100)
-      : 0;
+  const presentToday = Math.min(stats.presentToday, stats.totalEmployees);
+  const attendancePct = stats.totalEmployees > 0
+    ? Math.min(100, Math.round((presentToday / stats.totalEmployees) * 100)) : 0;
+  const absentToday = Math.max(0, stats.totalEmployees - presentToday);
+
+  const totalSalaries = stats.paidSalaries + stats.unpaidSalaries;
+  const paidPct = totalSalaries > 0 ? Math.round((stats.paidSalaries / totalSalaries) * 100) : 0;
+
+  const circumference = 2 * Math.PI * 70; // ≈ 439.8
 
   return (
     <AdminLayout title="Admin Dashboard">
       {loading && <LoadingAnimation />}
-      {/* Toast notification container */}
       <Toaster position="bottom-center" />
 
-      {/* Main dashboard content container */}
-      <div
-        className="container-fluid p-4"
-        style={{
-          background: "#ffffff",
-          minHeight: "calc(100vh - 56px)",
-        }}
-      >
-        {/* ================= Cards ================= */}
-        {/* First row of statistics cards */}
+      <div className="container-fluid p-4" style={{ background: "#f8f9fa", minHeight: "calc(100vh - 56px)" }}>
+
+        {/* ── Stat Cards ── */}
         <div className="row g-4">
-          {[
-            {
-              title: "Total Departments",
-              value: stats.totalDepartments,
-              icon: "bi-building",
-              iconColor: "#3498db",
-              gradient: "#ffffff",
-              link: "/departments"
-            },
-            {
-              title: "Total Employees",
-              value: stats.totalEmployees,
-              icon: "bi-people",
-              iconColor: "#9b59b6",
-              gradient: "#ffffff",
-              link: "/employees"
-            },
-            {
-              title: "Present Today",
-              value: stats.presentToday,
-              icon: "bi-person-check",
-              iconColor: "#2ecc71",
-              gradient: "#ffffff",
-              link: "/mark-attendance"
-            },
-          ].map((card, index) => (
-            <div key={index} className="col-12 col-md-6 col-lg-4">
-              {/* Clickable card with hover effect */}
+          {STAT_CARDS(stats).map((card, i) => (
+            <div key={i} className="col-12 col-sm-6 col-lg-4">
               <div
-                className="card border-0 shadow-lg"
-                style={{ 
-                  borderRadius: 20, 
-                  background: card.gradient,
-                  cursor: 'pointer',
-                  transform: 'scale(1)',
-                  transition: 'transform 0.2s'
-                }}
+                className="card border-0 shadow-sm h-100"
+                style={{ borderRadius: 16, cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s", borderLeft: `5px solid ${card.color}` }}
                 onClick={() => navigate(card.link)}
-                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = "translateY(-4px)"; (e.currentTarget as HTMLDivElement).style.boxShadow = "0 8px 24px rgba(0,0,0,0.12)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)"; (e.currentTarget as HTMLDivElement).style.boxShadow = ""; }}
               >
-                <div className="card-body p-4 d-flex justify-content-between">
+                <div className="card-body p-4 d-flex justify-content-between align-items-center">
                   <div>
-                    <h2 className="fw-bold" style={{ color: '#2c3e50' }}>
-                      {loading ? "..." : card.value}
-                    </h2>
-                    <p className="mb-0" style={{ color: '#7f8c8d' }}>{card.title}</p>
+                    <p className="mb-1 text-muted small fw-semibold text-uppercase" style={{ letterSpacing: "0.05em" }}>{card.title}</p>
+                    <h2 className="fw-bold mb-0" style={{ color: "#2c3e50" }}>{loading ? "—" : card.value}</h2>
                   </div>
-                  <i className={`bi ${card.icon} fs-1`} style={{ color: card.iconColor }} />
+                  <div style={{ width: 56, height: 56, borderRadius: "50%", background: `${card.color}18`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <i className={`bi ${card.icon} fs-3`} style={{ color: card.color }} />
+                  </div>
                 </div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Second row of statistics cards */}
-        <div className="row g-4 mt-2">
-          {/* Pending Leaves Card */}
-          <div className="col-12 col-md-6 col-lg-4">
-            <div
-              className="card border-0 shadow-lg"
-              style={{ 
-                borderRadius: 20, 
-                background: "#ffffff",
-                cursor: 'pointer',
-                transform: 'scale(1)',
-                transition: 'transform 0.2s'
-              }}
-              onClick={() => navigate('/leave-management')}
-              onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-              onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-            >
-              <div className="card-body p-4 d-flex justify-content-between">
-                <div>
-                  <h2 className="fw-bold" style={{ color: '#2c3e50' }}>{loading ? "..." : stats.pendingLeaves}</h2>
-                  <p className="mb-0" style={{ color: '#7f8c8d' }}>Pending Leaves</p>
-                </div>
-                <i className="bi bi-calendar-x fs-1" style={{ color: '#e74c3c' }} />
-              </div>
-            </div>
-          </div>
-          {/* Paid Salaries Card */}
-          <div className="col-12 col-md-6 col-lg-4">
-            <div
-              className="card border-0 shadow-lg"
-              style={{ 
-                borderRadius: 20, 
-                background: "#ffffff",
-                cursor: 'pointer',
-                transform: 'scale(1)',
-                transition: 'transform 0.2s'
-              }}
-              onClick={() => navigate('/salary-management')}
-              onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-              onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-            >
-              <div className="card-body p-4 d-flex justify-content-between">
-                <div>
-                  <h2 className="fw-bold" style={{ color: '#2c3e50' }}>{loading ? "..." : stats.paidSalaries}</h2>
-                  <p className="mb-0" style={{ color: '#7f8c8d' }}>Paid Salaries</p>
-                </div>
-                <i className="bi bi-cash-coin fs-1" style={{ color: '#27ae60' }} />
-              </div>
-            </div>
-          </div>
-          {/* Unpaid Salaries Card */}
-          <div className="col-12 col-md-6 col-lg-4">
-            <div
-              className="card border-0 shadow-lg"
-              style={{ 
-                borderRadius: 20, 
-                background: "#ffffff",
-                cursor: 'pointer',
-                transform: 'scale(1)',
-                transition: 'transform 0.2s'
-              }}
-              onClick={() => navigate('/salary-management')}
-              onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-              onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-            >
-              <div className="card-body p-4 d-flex justify-content-between">
-                <div>
-                  <h2 className="fw-bold" style={{ color: '#2c3e50' }}>{loading ? "..." : stats.unpaidSalaries}</h2>
-                  <p className="mb-0" style={{ color: '#7f8c8d' }}>Unpaid Salaries</p>
-                </div>
-                <i className="bi bi-exclamation-triangle fs-1" style={{ color: '#f39c12' }} />
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* ── Attendance Overview + Salary Summary ── */}
+        <div className="row g-4 mt-1">
 
-        {/* ================= Attendance Overview ================= */}
-        {/* Visual representation of today's attendance with circular progress */}
-        <div className="row g-4 mt-2">
-          <div className="col-12">
-            <div className="card border-0 shadow-lg" style={{ borderRadius: 20 }}>
+          {/* Attendance donut */}
+          <div className="col-12 col-lg-6">
+            <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 16 }}>
               <div className="card-body p-4">
-                <h5 className="fw-bold mb-4" style={{ color: '#2c3e50' }}>
-                  <i className="bi bi-graph-up me-2"></i>Today's Attendance Overview
-                </h5>
-                <div className="d-flex flex-column flex-md-row align-items-center justify-content-around gap-4">
-                  {/* Circular progress chart showing attendance percentage */}
-                  <div className="text-center">
-                    <div className="position-relative d-inline-block">
-                      <svg width="180" height="180">
-                        {/* Background circle */}
-                        <circle cx="90" cy="90" r="70" fill="none" stroke="#e9ecef" strokeWidth="18"/>
-                        {/* Progress circle - length based on attendance percentage */}
-                        <circle cx="90" cy="90" r="70" fill="none" stroke="#3498db" strokeWidth="18" 
-                          strokeDasharray={`${attendancePercentage * 4.4} 440`}
-                          strokeLinecap="round" transform="rotate(-90 90 90)"/>
-                      </svg>
-                      {/* Percentage text in center of circle */}
-                      <div className="position-absolute top-50 start-50 translate-middle">
-                        <h1 className="fw-bold mb-0" style={{ color: '#2c3e50', fontSize: '2.5rem' }}>{attendancePercentage}%</h1>
-                        <small className="text-muted">Attendance Rate</small>
-                      </div>
+                <h6 className="fw-bold mb-4" style={{ color: "#2c3e50" }}>
+                  <i className="bi bi-graph-up me-2" style={{ color: "#3498db" }} />Today's Attendance
+                </h6>
+                <div className="d-flex flex-column flex-sm-row align-items-center justify-content-around gap-4">
+                  <div className="text-center position-relative">
+                    <svg width="160" height="160">
+                      <circle cx="80" cy="80" r="70" fill="none" stroke="#e9ecef" strokeWidth="16" />
+                      <circle cx="80" cy="80" r="70" fill="none" stroke="#3498db" strokeWidth="16"
+                        strokeDasharray={`${(attendancePct / 100) * circumference} ${circumference}`}
+                        strokeLinecap="round" transform="rotate(-90 80 80)" />
+                    </svg>
+                    <div className="position-absolute top-50 start-50 translate-middle text-center">
+                      <h2 className="fw-bold mb-0" style={{ color: "#2c3e50" }}>{attendancePct}%</h2>
+                      <small className="text-muted">Rate</small>
                     </div>
                   </div>
-                  {/* Attendance breakdown: Present, Absent, Total */}
-                  <div className="d-flex flex-wrap gap-3 gap-md-5 justify-content-center">
-                    {/* Present employees */}
-                    <div className="text-center">
-                      <div className="mb-2" style={{ width: 80, height: 80, borderRadius: '50%', background: '#2ecc71', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <i className="bi bi-person-check fs-1 text-white"></i>
+                  <div className="d-flex flex-row flex-sm-column gap-4">
+                    {[
+                      { label: "Present", value: presentToday,    color: "#2ecc71", icon: "bi-person-check" },
+                      { label: "Absent",  value: absentToday,      color: "#e74c3c", icon: "bi-person-x" },
+                      { label: "Total",   value: stats.totalEmployees,                      color: "#3498db", icon: "bi-people" },
+                    ].map(item => (
+                      <div key={item.label} className="d-flex align-items-center gap-3">
+                        <div style={{ width: 44, height: 44, borderRadius: "50%", background: item.color, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <i className={`bi ${item.icon} text-white`} />
+                        </div>
+                        <div>
+                          <div className="fw-bold" style={{ color: "#2c3e50" }}>{item.value}</div>
+                          <small className="text-muted">{item.label}</small>
+                        </div>
                       </div>
-                      <h3 className="fw-bold mb-0" style={{ color: '#2c3e50' }}>{stats.presentToday}</h3>
-                      <small className="text-muted">Present</small>
-                    </div>
-                    {/* Absent employees (calculated) */}
-                    <div className="text-center">
-                      <div className="mb-2" style={{ width: 80, height: 80, borderRadius: '50%', background: '#9b59b6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <i className="bi bi-person-x fs-1 text-white"></i>
-                      </div>
-                      <h3 className="fw-bold mb-0" style={{ color: '#2c3e50' }}>{stats.totalEmployees - stats.presentToday}</h3>
-                      <small className="text-muted">Absent</small>
-                    </div>
-                    {/* Total employees */}
-                    <div className="text-center">
-                      <div className="mb-2" style={{ width: 80, height: 80, borderRadius: '50%', background: '#3498db', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <i className="bi bi-people fs-1 text-white"></i>
-                      </div>
-                      <h3 className="fw-bold mb-0" style={{ color: '#2c3e50' }}>{stats.totalEmployees}</h3>
-                      <small className="text-muted">Total</small>
-                    </div>
+                    ))}
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* ================= Monthly Summary ================= */}
-        {/* Summary card showing current month statistics */}
-        <div className="row g-4 mt-2">
-          <div className="col-md-12">
-            <div className="card border-0 shadow-lg" style={{ borderRadius: 20 }}>
+          {/* Salary summary */}
+          <div className="col-12 col-lg-6">
+            <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 16 }}>
               <div className="card-body p-4">
-                <h5 className="fw-bold mb-4" style={{ color: '#2c3e50' }}>
-                  <i className="bi bi-calendar-month me-2"></i>This Month Summary - {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                </h5>
+                <h6 className="fw-bold mb-4" style={{ color: "#2c3e50" }}>
+                  <i className="bi bi-cash-stack me-2" style={{ color: "#27ae60" }} />Salary Overview
+                </h6>
+                <div className="d-flex justify-content-between mb-1">
+                  <small className="text-muted">Paid</small>
+                  <small className="fw-semibold" style={{ color: "#27ae60" }}>{paidPct}%</small>
+                </div>
+                <div className="progress mb-4" style={{ height: 10, borderRadius: 8 }}>
+                  <div className="progress-bar" role="progressbar" style={{ width: `${paidPct}%`, background: "#27ae60", borderRadius: 8 }} />
+                </div>
                 <div className="row g-3">
-                  {/* Total working days in current month */}
-                  <div className="col-12 col-md-6">
-                    <div className="p-3 rounded" style={{ background: '#f8f9fa' }}>
-                      <div className="d-flex align-items-center justify-content-between">
-                        <div>
-                          <small className="text-muted d-block">Total Working Days</small>
-                          {/* Calculate last day of current month */}
-                          <h4 className="fw-bold mb-0" style={{ color: '#2c3e50' }}>{new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()}</h4>
-                        </div>
-                        <i className="bi bi-calendar3 fs-2" style={{ color: '#e67e22' }}></i>
+                  {[
+                    { label: "Paid",    value: stats.paidSalaries,   color: "#27ae60", icon: "bi-check-circle" },
+                    { label: "Unpaid",  value: stats.unpaidSalaries, color: "#f39c12", icon: "bi-exclamation-circle" },
+                    { label: "Total",   value: totalSalaries,        color: "#3498db", icon: "bi-people" },
+                  ].map(item => (
+                    <div key={item.label} className="col-4">
+                      <div className="p-3 rounded text-center" style={{ background: `${item.color}12` }}>
+                        <i className={`bi ${item.icon} fs-4 mb-1 d-block`} style={{ color: item.color }} />
+                        <div className="fw-bold" style={{ color: "#2c3e50" }}>{item.value}</div>
+                        <small className="text-muted">{item.label}</small>
                       </div>
                     </div>
+                  ))}
+                </div>
+
+                {/* Month info */}
+                <div className="mt-4 p-3 rounded d-flex justify-content-between align-items-center" style={{ background: "#f8f9fa" }}>
+                  <div>
+                    <small className="text-muted d-block">Current Month</small>
+                    <span className="fw-semibold" style={{ color: "#2c3e50" }}>
+                      {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                    </span>
                   </div>
-                  {/* Average attendance percentage */}
-                  <div className="col-12 col-md-6">
-                    <div className="p-3 rounded" style={{ background: '#f8f9fa' }}>
-                      <div className="d-flex align-items-center justify-content-between">
-                        <div>
-                          <small className="text-muted d-block">Avg Attendance</small>
-                          <h4 className="fw-bold mb-0" style={{ color: '#2c3e50' }}>{attendancePercentage}%</h4>
-                        </div>
-                        <i className="bi bi-graph-up-arrow fs-2" style={{ color: '#16a085' }}></i>
-                      </div>
-                    </div>
-                  </div>
+                  <i className="bi bi-calendar3 fs-3" style={{ color: "#e67e22" }} />
                 </div>
               </div>
             </div>
           </div>
         </div>
+
+        {/* ── Quick Actions ── */}
+        <div className="row g-4 mt-1">
+          <div className="col-12">
+            <div className="card border-0 shadow-sm" style={{ borderRadius: 16 }}>
+              <div className="card-body p-4">
+                <h6 className="fw-bold mb-4" style={{ color: "#2c3e50" }}>
+                  <i className="bi bi-lightning-charge me-2" style={{ color: "#f39c12" }} />Quick Actions
+                </h6>
+                <div className="row g-3">
+                  {QUICK_ACTIONS.map((action, i) => (
+                    <div key={i} className="col-6 col-md-3">
+                      <button
+                        className="btn w-100 d-flex flex-column align-items-center gap-2 py-3"
+                        style={{ borderRadius: 12, border: `1.5px solid ${action.color}20`, background: `${action.color}0d`, transition: "all 0.2s" }}
+                        onClick={() => navigate(action.link)}
+                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = `${action.color}22`; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = `${action.color}0d`; }}
+                      >
+                        <i className={`bi ${action.icon} fs-3`} style={{ color: action.color }} />
+                        <span className="fw-semibold small" style={{ color: "#2c3e50" }}>{action.label}</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </AdminLayout>
   );
