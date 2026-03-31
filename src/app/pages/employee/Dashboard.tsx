@@ -7,6 +7,7 @@ import { ProfileTab } from './ProfileTab';
 import { AttendanceTab } from './AttendanceTab';
 import { LeavesTab } from './LeavesTab';
 import { SalaryTab } from './SalaryTab';
+import { ChatTab } from './ChatTab';
 import { makeAuthenticatedRequest } from '../../../utils/apiUtils';
 import { LoadingAnimation } from '../../components/LoadingAnimation';
 
@@ -92,7 +93,9 @@ export function EmployeeDashboard() {
           email: apiUserData?.email || userData.email || 'N/A',
           username: apiUserData?.username || userData.username || 'N/A',
           department_name: apiUserData?.department_name || 'N/A',
+          department_id: apiUserData?.department ? String(apiUserData.department) : undefined,
           designation: designationName,
+          designation_id: designationId ? String(designationId) : undefined,
           contact_no: apiUserData?.contact_no || 'N/A',
           date_of_joining: apiUserData?.date_of_joining || 'N/A'
         });
@@ -248,6 +251,7 @@ export function EmployeeDashboard() {
     { id: 'attendance', icon: 'bi-calendar-check', label: 'Attendance' },
     { id: 'leaves', icon: 'bi-calendar-x', label: 'Leaves' },
     { id: 'salary', icon: 'bi-cash-stack', label: 'Salary' },
+    { id: 'chat', icon: 'bi-chat-dots', label: 'Chat' },
   ];
 
   return (
@@ -355,46 +359,49 @@ export function EmployeeDashboard() {
           </div>
         </nav>
         
-        <div className="container-fluid p-4" style={{ maxWidth: '100%', overflowX: 'hidden' }}>
-          <div className="row mb-4 g-3">
-            <div className="col-12 col-md-6">
-              <div className="card shadow-sm border-0" style={{ background: '#ffffff' }}>
-                <div className="card-body text-center">
-                  <i className="bi bi-box-arrow-in-right fs-1 mb-2" style={{ color: '#2c3e50' }}></i>
-                  <h5 style={{ color: '#2c3e50' }}>Check In</h5>
-                  <button 
-                    className="btn text-white" 
-                    onClick={handleCheckIn}
-                    disabled={!!todayAttendance}
-                    style={{ background: '#2b3d4f', border: 'none' }}
-                  >
-                    {todayAttendance ? 'Already Checked In Today' : 'Check In'}
-                  </button>
+        <div className="container-fluid" style={{ maxWidth: '100%', overflowX: 'hidden', padding: activeTab === 'chat' ? '0' : '1.5rem' }}>
+          {activeTab !== 'chat' && (
+            <div className="row mb-4 g-3">
+              <div className="col-12 col-md-6">
+                <div className="card shadow-sm border-0" style={{ background: '#ffffff' }}>
+                  <div className="card-body text-center">
+                    <i className="bi bi-box-arrow-in-right fs-1 mb-2" style={{ color: '#2c3e50' }}></i>
+                    <h5 style={{ color: '#2c3e50' }}>Check In</h5>
+                    <button
+                      className="btn text-white"
+                      onClick={handleCheckIn}
+                      disabled={!!todayAttendance}
+                      style={{ background: '#2b3d4f', border: 'none' }}
+                    >
+                      {todayAttendance ? 'Already Checked In Today' : 'Check In'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="col-12 col-md-6">
+                <div className="card shadow-sm border-0" style={{ background: '#ffffff' }}>
+                  <div className="card-body text-center">
+                    <i className="bi bi-box-arrow-right fs-1 mb-2" style={{ color: '#2c3e50' }}></i>
+                    <h5 style={{ color: '#2c3e50' }}>Check Out</h5>
+                    <button
+                      className="btn text-white"
+                      onClick={handleCheckOut}
+                      disabled={!todayAttendance || hasCheckedOut}
+                      style={{ background: '#2b3d4f', border: 'none' }}
+                    >
+                      {hasCheckedOut ? 'Already Checked Out' : !todayAttendance ? 'Check In First' : 'Check Out'}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-            <div className="col-12 col-md-6">
-              <div className="card shadow-sm border-0" style={{ background: '#ffffff' }}>
-                <div className="card-body text-center">
-                  <i className="bi bi-box-arrow-right fs-1 mb-2" style={{ color: '#2c3e50' }}></i>
-                  <h5 style={{ color: '#2c3e50' }}>Check Out</h5>
-                  <button 
-                    className="btn text-white" 
-                    onClick={handleCheckOut}
-                    disabled={!todayAttendance || hasCheckedOut}
-                    style={{ background: '#2b3d4f', border: 'none' }}
-                  >
-                    {hasCheckedOut ? 'Already Checked Out' : !todayAttendance ? 'Check In First' : 'Check Out'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+          )}
 
           {activeTab === 'profile' && <ProfileTab employee={employee} />}
           {activeTab === 'attendance' && <AttendanceTab attendances={attendances} />}
           {activeTab === 'leaves' && <LeavesTab leaves={leaves} onLeaveApplied={fetchLeaveData} />}
           {activeTab === 'salary' && <SalaryTab />}
+          {activeTab === 'chat' && <ChatTab employee={employee} />}
         </div>
       </div>
     </div>

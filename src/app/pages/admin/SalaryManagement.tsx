@@ -1,5 +1,6 @@
 // React hooks for state and lifecycle management
 import { useState, useEffect } from "react";
+import React from "react";
 // Router hook for navigation
 import { useNavigate } from "react-router-dom";
 // Toast notifications for user feedback
@@ -99,6 +100,29 @@ const WORKING_DAYS: Record<number, number> = {
   7: 21, 8: 20, 9: 20, 10: 21, 11: 20, 12: 21
 };
 
+const EMPTY_FORM = (): SalaryForm => ({
+  user: '',
+  year: '',
+  month: new Date().getMonth() + 1,
+  attendance: '',
+  basic_salary: '',
+  hra: '',
+  allowance: '',
+  total_working_days: WORKING_DAYS[new Date().getMonth() + 1],
+  present_days: 0,
+  absent_days: 0,
+  half_days: 0,
+  gross_salary: '0',
+  per_day_salary: '0',
+  unpaid_leave_deduction: '0',
+  earned_salary: '0',
+  pf_percentage: '12.00',
+  pf_amount: '0',
+  deduction: '0',
+  net_salary: '0',
+  payment_status: 'unpaid'
+});
+
 // Array of month names for dropdown and display
 const MONTHS = [
   { value: 1, label: 'January' },
@@ -131,29 +155,10 @@ export function SalaryManagement() {
   const [editingId, setEditingId] = useState<string | null>(null);
   // Loading state for form submission
   const [loading, setLoading] = useState(false);
-  
-  const [formData, setFormData] = useState<SalaryForm>({
-    user: '',
-    year: '',
-    month: new Date().getMonth() + 1,
-    attendance: '',
-    basic_salary: '',
-    hra: '',
-    allowance: '',
-    total_working_days: WORKING_DAYS[new Date().getMonth() + 1],
-    present_days: 0,
-    absent_days: 0,
-    half_days: 0,
-    gross_salary: '0',
-    per_day_salary: '0',
-    unpaid_leave_deduction: '0',
-    earned_salary: '0',
-    pf_percentage: '12.00',
-    pf_amount: '0',
-    deduction: '0',
-    net_salary: '0',
-    payment_status: 'unpaid'
-  });
+  // Ref to skip salary recalc useEffect when loading edit data
+  const skipCalcRef = React.useRef(false);
+
+  const [formData, setFormData] = useState<SalaryForm>(EMPTY_FORM());
 
   // Effect runs on component mount - checks authentication and loads initial data
   useEffect(() => {
@@ -188,6 +193,7 @@ export function SalaryManagement() {
 
   // Effect runs when salary components change - recalculates net salary
   useEffect(() => {
+    if (skipCalcRef.current) return;
     // FIX: parse all inputs once into stable numbers — prevents dep array churn
     const basic       = parseFloat(formData.basic_salary) || 0;
     const hra         = parseFloat(formData.hra)          || 0;
@@ -386,7 +392,8 @@ export function SalaryManagement() {
         attendance: allRecords[0]?.id || ''
       }));
     } catch (error) {
-          }
+      toast.error('Failed to fetch attendance');
+    }
   };
 
 
@@ -397,12 +404,11 @@ export function SalaryManagement() {
 
   // Function to handle editing an existing salary record
   const handleEdit = async (salary: SalaryRecord) => {
-    // Set editing mode with salary ID
     setEditingId(salary.id);
-    
-    // Fetch latest salary data from user API
     const employee = employees.find(emp => emp.id === salary.user?.id);
-    
+
+    // Block recalc useEffect while we load saved values
+    skipCalcRef.current = true;
     setFormData({
       user: salary.user?.id.toString() || '',
       year: salary.year,
@@ -425,7 +431,36 @@ export function SalaryManagement() {
       net_salary: salary.net_salary,
       payment_status: salary.payment_status
     });
-    // Scroll to top to show form
+    // Re-fetch fresh attendance for this employee/month so edits use live data
+    const selectedEmployee = employees.find(e => e.id === salary.user?.id);
+    const selectedYear = years.find(y => y.id === salary.year)?.year;
+    const selectedMonth = MONTHS.find(m => m.value === salary.month)?.label.toLowerCase();
+    if (selectedEmployee?.emp_code && selectedYear && selectedMonth) {
+      try {
+        let allRecords: Attendance[] = [];
+        let nextUrl = `${config.api.host}${config.api.attendance}?emp_code=${selectedEmployee.emp_code}&year=${selectedYear}&month=${selectedMonth}&page_size=100`;
+        while (nextUrl) {
+          const res = await makeAuthenticatedRequest(nextUrl);
+          if (!res.ok) break;
+          const data = await res.json();
+          allRecords = [...allRecords, ...(data.results || [])];
+          nextUrl = data.next;
+        }
+        let presentDays = 0, halfDays = 0;
+        allRecords.forEach((att: Attendance) => {
+          if (att.total_hours) {
+            const [hours] = att.total_hours.split(':').map(Number);
+            if (hours >= 7) presentDays++;
+            else if (hours >= 4) halfDays++;
+          }
+        });
+        setFormData(prev => ({ ...prev, present_days: presentDays, half_days: halfDays, attendance: allRecords[0]?.id || '' }));
+      } catch {
+        toast.error('Failed to refresh attendance for edit');
+      }
+    }
+    // Allow recalc again after state settles
+    setTimeout(() => { skipCalcRef.current = false; }, 0);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -544,29 +579,8 @@ export function SalaryManagement() {
         }
         
         setEditingId(null);
-        setFormData({
-          user: '',
-          year: '',
-          month: new Date().getMonth() + 1,
-          attendance: '',
-          basic_salary: '',
-          hra: '',
-          allowance: '',
-          total_working_days: WORKING_DAYS[new Date().getMonth() + 1],
-          present_days: 0,
-          absent_days: 0,
-          half_days: 0,
-          gross_salary: '0',
-          per_day_salary: '0',
-          unpaid_leave_deduction: '0',
-          earned_salary: '0',
-          pf_percentage: '12.00',
-          pf_amount: '0',
-          deduction: '0',
-          net_salary: '0',
-          payment_status: 'unpaid'
-        });
-        fetchSalaries(employees, years); // Refresh salary list
+        setFormData(EMPTY_FORM());
+        fetchSalaries(employees, years);
       } else {
         const errorText = await response.text();
         let errorMsg = 'Failed to save salary';
@@ -600,31 +614,7 @@ export function SalaryManagement() {
                 type="button"
                 className="btn btn-sm shadow-sm"
                 style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '6px' }}
-                onClick={() => {
-                  setEditingId(null);
-                  setFormData({
-                    user: '',
-                    year: '',
-                    month: new Date().getMonth() + 1,
-                    attendance: '',
-                    basic_salary: '',
-                    hra: '',
-                    allowance: '',
-                    total_working_days: WORKING_DAYS[new Date().getMonth() + 1],
-                    present_days: 0,
-                    absent_days: 0,
-                    half_days: 0,
-                    gross_salary: '0',
-                    per_day_salary: '0',
-                    unpaid_leave_deduction: '0',
-                    earned_salary: '0',
-                    pf_percentage: '12.00',
-                    pf_amount: '0',
-                    deduction: '0',
-                    net_salary: '0',
-                    payment_status: 'unpaid'
-                  });
-                }}
+                onClick={() => { setEditingId(null); setFormData(EMPTY_FORM()); }}
               >
                 Cancel Edit
               </button>

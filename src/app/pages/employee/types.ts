@@ -7,7 +7,9 @@ export interface Employee {
   username?: string;
   department?: string;
   department_name?: string;
+  department_id?: string;
   designation?: string;
+  designation_id?: string;
   contact_no?: string;
   date_of_joining?: string;
 }
