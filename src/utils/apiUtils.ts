@@ -84,7 +84,7 @@ export const fetchAllPages = async (baseUrl: string) => {
     const response = await makeAuthenticatedRequest(`${baseUrl}${sep}page=${page}&page_size=100`);
     if (!response.ok) break;
     const data = await response.json();
-    allData = [...allData, ...(data.results || [])];
+    allData.push(...(data.results || []));
     if (!data.next) break;
     page++;
   }

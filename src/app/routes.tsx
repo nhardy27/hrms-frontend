@@ -1,18 +1,21 @@
 import { createBrowserRouter } from "react-router-dom";
-import { 
-  AdminDashboard, 
-  MarkAttendance,
-  DepartmentManagement,
-  DesignationManagement,
-  EmployeeForm,
-  EmployeeList,
-  LeaveManagement,
-  SalaryManagement,
-  SalarySlip
-} from "./pages/admin";
-import { EmployeeDashboard } from "./pages/employee";
-import { EmployeeSalarySlip } from "./pages/employee/EmployeeSalarySlip";
-import Login from "./pages/Login";
+import { lazy, Suspense } from "react";
+import { LoadingAnimation } from "./components/LoadingAnimation";
+
+const AdminDashboard      = lazy(() => import("./pages/admin/Dashboard").then(m => ({ default: m.AdminDashboard })));
+const MarkAttendance      = lazy(() => import("./pages/admin/MarkAttendance").then(m => ({ default: m.MarkAttendance })));
+const DepartmentManagement = lazy(() => import("./pages/admin/DepartmentManagement").then(m => ({ default: m.DepartmentPage })));
+const DesignationManagement = lazy(() => import("./pages/admin/DesignationManagement").then(m => ({ default: m.DesignationPage })));
+const EmployeeForm        = lazy(() => import("./pages/admin/EmployeeForm").then(m => ({ default: m.EmployeeForm })));
+const EmployeeList        = lazy(() => import("./pages/admin/EmployeeList").then(m => ({ default: m.EmployeeList })));
+const LeaveManagement     = lazy(() => import("./pages/admin/LeaveManagement").then(m => ({ default: m.LeaveManagement })));
+const SalaryManagement    = lazy(() => import("./pages/admin/SalaryManagement").then(m => ({ default: m.SalaryManagement })));
+const SalarySlip          = lazy(() => import("./pages/admin/SalarySlip").then(m => ({ default: m.SalarySlip })));
+const EmployeeDashboard   = lazy(() => import("./pages/employee/Dashboard").then(m => ({ default: m.EmployeeDashboard })));
+const EmployeeSalarySlip  = lazy(() => import("./pages/employee/EmployeeSalarySlip").then(m => ({ default: m.EmployeeSalarySlip })));
+const Login               = lazy(() => import("./pages/Login"));
+
+const Fallback = () => <LoadingAnimation />;
 
 export const router = createBrowserRouter([
   {
@@ -28,55 +31,55 @@ export const router = createBrowserRouter([
   },
   {
     path: "/login",
-    Component: Login,
+    element: <Suspense fallback={<Fallback />}><Login /></Suspense>,
   },
   {
     path: "/admin-dashboard",
-    Component: AdminDashboard,
+    element: <Suspense fallback={<Fallback />}><AdminDashboard /></Suspense>,
   },
   {
     path: "/mark-attendance",
-    Component: MarkAttendance,
+    element: <Suspense fallback={<Fallback />}><MarkAttendance /></Suspense>,
   },
   {
     path: "/employees",
-    Component: EmployeeList,
+    element: <Suspense fallback={<Fallback />}><EmployeeList /></Suspense>,
   },
   {
     path: "/employees/add",
-    Component: EmployeeForm,
+    element: <Suspense fallback={<Fallback />}><EmployeeForm /></Suspense>,
   },
   {
     path: "/employees/edit/:id",
-    Component: EmployeeForm,
+    element: <Suspense fallback={<Fallback />}><EmployeeForm /></Suspense>,
   },
   {
     path: "/departments",
-    Component: DepartmentManagement,
+    element: <Suspense fallback={<Fallback />}><DepartmentManagement /></Suspense>,
   },
   {
     path: "/designations",
-    Component: DesignationManagement,
+    element: <Suspense fallback={<Fallback />}><DesignationManagement /></Suspense>,
   },
   {
     path: "/employee-dashboard",
-    Component: EmployeeDashboard,
+    element: <Suspense fallback={<Fallback />}><EmployeeDashboard /></Suspense>,
   },
   {
     path: "/leave-management",
-    Component: LeaveManagement,
+    element: <Suspense fallback={<Fallback />}><LeaveManagement /></Suspense>,
   },
   {
     path: "/salary-management",
-    Component: SalaryManagement,
+    element: <Suspense fallback={<Fallback />}><SalaryManagement /></Suspense>,
   },
   {
     path: "/salary-slip/:id",
-    Component: SalarySlip,
+    element: <Suspense fallback={<Fallback />}><SalarySlip /></Suspense>,
   },
   {
     path: "/employee-salary-slip/:id",
-    Component: EmployeeSalarySlip,
+    element: <Suspense fallback={<Fallback />}><EmployeeSalarySlip /></Suspense>,
   },
 
   {

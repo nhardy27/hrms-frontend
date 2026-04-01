@@ -243,6 +243,7 @@ export function ChatTab({ employee, pendingChatUserId, onPendingChatHandled }: C
         )}
         {filteredEmployees.map(emp => {
           const isActive = selectedEmployee?.user_id === emp.user_id;
+          const subtitle = [emp.designation, emp.department].filter(Boolean).join(' · ') || emp.username;
           return (
             <button
               key={emp.user_id}
@@ -250,7 +251,7 @@ export function ChatTab({ employee, pendingChatUserId, onPendingChatHandled }: C
               style={{
                 width: '100%', border: 'none', textAlign: 'left', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: 12,
-                padding: '10px 14px',
+                padding: '11px 14px',
                 background: isActive ? C.sidebarActive : 'transparent',
                 borderLeft: isActive ? `3px solid ${C.accent}` : '3px solid transparent',
                 transition: 'background 0.15s',
@@ -258,20 +259,30 @@ export function ChatTab({ employee, pendingChatUserId, onPendingChatHandled }: C
               onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = C.sidebarHover; }}
               onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
             >
-              <div style={{
-                width: 42, height: 42, borderRadius: 12, flexShrink: 0,
-                background: avatarColor(emp.name),
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#fff', fontWeight: 700, fontSize: 14, letterSpacing: 0.5
-              }}>
-                {getInitials(emp.name)}
+              {/* Avatar with online dot */}
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                <div style={{
+                  width: 44, height: 44, borderRadius: 13,
+                  background: avatarColor(emp.name),
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#fff', fontWeight: 700, fontSize: 15, letterSpacing: 0.5,
+                  boxShadow: isActive ? `0 0 0 2px ${C.accent}` : 'none',
+                  transition: 'box-shadow 0.15s',
+                }}>
+                  {getInitials(emp.name)}
+                </div>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: '#fff', fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {emp.name}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+                  <span style={{ color: '#fff', fontWeight: isActive ? 700 : 600, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {emp.name}
+                  </span>
+                  {emp.emp_code && (
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>{emp.emp_code}</span>
+                  )}
                 </div>
-                <div style={{ color: C.mutedText, fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 2 }}>
-                  {[emp.designation, emp.department].filter(Boolean).join(' · ') || emp.username}
+                <div style={{ color: isActive ? 'rgba(255,255,255,0.7)' : C.mutedText, fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 3 }}>
+                  {subtitle}
                 </div>
               </div>
             </button>
@@ -364,21 +375,21 @@ export function ChatTab({ employee, pendingChatUserId, onPendingChatHandled }: C
               return (
                 <div key={i} style={{ display: 'flex', justifyContent: isMine ? 'flex-end' : 'flex-start', marginBottom: 6 }}>
                   {!isMine && (
-                    <div style={{ width: 30, height: 30, borderRadius: 9, background: avatarColor(msg.sender), display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 11, fontWeight: 700, flexShrink: 0, marginRight: 8, alignSelf: 'flex-end', marginBottom: 2 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 9, background: avatarColor(msg.sender), display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, fontWeight: 700, flexShrink: 0, marginRight: 8, alignSelf: 'flex-end', marginBottom: 2 }}>
                       {getInitials(msg.sender)}
                     </div>
                   )}
                   <div style={{
-                    maxWidth: 'min(72%, 420px)',
+                    maxWidth: 'min(85%, 600px)',
                     background: isMine ? C.myBubble : C.theirBubble,
                     color: isMine ? C.myBubbleText : C.theirBubbleText,
                     borderRadius: isMine ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                    padding: '9px 13px 7px',
+                    padding: '10px 14px 8px',
                     boxShadow: isMine ? '0 2px 8px rgba(43,61,79,0.25)' : '0 1px 4px rgba(0,0,0,0.08)',
                     wordBreak: 'break-word',
                   }}>
-                    <div style={{ fontSize: 14, lineHeight: 1.5 }}>{msg.message}</div>
-                    <div style={{ fontSize: 10, marginTop: 4, textAlign: 'right', opacity: isMine ? 0.6 : 0.45 }}>
+                    <div style={{ fontSize: 15, lineHeight: 1.6, fontWeight: 500, letterSpacing: 0.1 }}>{msg.message}</div>
+                    <div style={{ fontSize: 11, marginTop: 5, textAlign: 'right', opacity: isMine ? 0.65 : 0.5, fontWeight: 500 }}>
                       {formatTime(msg.timestamp)}
                     </div>
                   </div>
@@ -398,7 +409,7 @@ export function ChatTab({ employee, pendingChatUserId, onPendingChatHandled }: C
           style={{
             flex: 1, border: `1.5px solid ${connected ? C.inputBorder : '#e2e8f0'}`, outline: 'none',
             borderRadius: 12, background: connected ? C.inputBg : '#f8fafc',
-            fontSize: 14, padding: '10px 14px', color: '#1a2533', minWidth: 0,
+            fontSize: 15, padding: '10px 14px', color: '#1a2533', minWidth: 0,
             transition: 'border-color 0.2s',
           }}
           placeholder={connected ? 'Type a message...' : 'Not connected'}
@@ -461,13 +472,13 @@ export function ChatTab({ employee, pendingChatUserId, onPendingChatHandled }: C
         boxShadow: '0 4px 24px rgba(0,0,0,0.10)',
         border: '1px solid #e2e8f0',
       }}>
-        {/* Left sidebar */}
-        <div style={{ width: 280, flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Left sidebar – 30% */}
+        <div style={{ width: '30%', flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {ContactList}
         </div>
 
-        {/* Right panel */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Right panel – 70% */}
+        <div style={{ width: '70%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {selectedEmployee ? <>{ChatHeader}{MessagesArea}</> : EmptyState}
         </div>
       </div>
