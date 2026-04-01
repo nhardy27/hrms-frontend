@@ -178,11 +178,7 @@ export function ChatTab({ employee, pendingChatUserId, onPendingChatHandled }: C
       e.user_id !== Number(employee?.id) &&
       `${e.name} ${e.username} ${e.department ?? ''} ${e.designation ?? ''}`.toLowerCase().includes(search.toLowerCase())
     )
-    .sort((a, b) => {
-      if (a.user_id === selectedEmployee?.user_id) return -1;
-      if (b.user_id === selectedEmployee?.user_id) return 1;
-      return 0;
-    });
+;
 
   const messageGroups: { dateLabel: string; msgs: Message[] }[] = [];
   messages.forEach(msg => {
@@ -390,7 +386,7 @@ export function ChatTab({ employee, pendingChatUserId, onPendingChatHandled }: C
                   }}>
                     <div style={{ fontSize: 15, lineHeight: 1.6, fontWeight: 500, letterSpacing: 0.1 }}>{msg.message}</div>
                     <div style={{ fontSize: 11, marginTop: 5, textAlign: 'right', opacity: isMine ? 0.65 : 0.5, fontWeight: 500 }}>
-                      {formatTime(msg.timestamp)}
+                      {formatTime(msg.timestamp)}{isMine ? ' · Sent' : ''}
                     </div>
                   </div>
                 </div>
