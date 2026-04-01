@@ -429,88 +429,84 @@ export function EmployeeDashboard() {
 
       {/* Main Content */}
       <div 
-        className="flex-grow-1" 
+        className="flex-grow-1 main-content" 
         style={{ 
-          marginLeft: window.innerWidth >= 768 ? '260px' : '0',
           width: '100%',
           maxWidth: '100vw',
           overflowX: 'hidden'
         }}
       >
-        <nav className="navbar navbar-expand-lg shadow-sm" style={{ background: '#ffffff', borderBottom: '1px solid #e9ecef' }}>
-          <div className="container-fluid">
-            <button 
-              className="btn btn-link d-md-none me-2" 
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              style={{ color: '#2c3e50', textDecoration: 'none' }}
-            >
-              <i className="bi bi-list fs-4"></i>
-            </button>
-            <span className="navbar-brand fw-bold" style={{ color: '#2c3e50' }}>Employee Portal - {employee?.first_name?.toUpperCase()}</span>
-            <div className="navbar-nav ms-auto d-flex align-items-center gap-2">
-              {/* Notification Bell */}
-              <div ref={notifPanelRef} style={{ position: 'relative' }}>
-                <button
-                  className="btn btn-link"
-                  style={{ color: '#2c3e50', textDecoration: 'none', position: 'relative', padding: '4px 8px' }}
-                  onClick={() => { setShowNotifPanel(p => !p); setNotifications(prev => prev.map(n => ({ ...n, read: true }))); }}
-                >
-                  <i className="bi bi-bell fs-5"></i>
-                  {unreadCount > 0 && (
-                    <span style={{ position: 'absolute', top: 0, right: 2, background: '#e74c3c', color: '#fff', borderRadius: '50%', fontSize: 10, width: 17, height: 17, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
-                </button>
-
-                {showNotifPanel && (
-                  <div style={{ position: 'absolute', right: 0, top: '110%', width: 320, background: '#fff', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.15)', zIndex: 2000, overflow: 'hidden' }}>
-                    <div style={{ background: '#2b3d4f', color: '#fff', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ fontWeight: 600, fontSize: 14 }}>Notifications</span>
-                      {notifications.length > 0 && (
-                        <button onClick={() => setNotifications([])} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', fontSize: 12, cursor: 'pointer' }}>Clear all</button>
-                      )}
-                    </div>
-                    <div style={{ maxHeight: 360, overflowY: 'auto' }}>
-                      {notifications.length === 0 ? (
-                        <div style={{ padding: '32px 16px', textAlign: 'center', color: '#8696a0', fontSize: 13 }}>
-                          <i className="bi bi-bell-slash" style={{ fontSize: 28, display: 'block', marginBottom: 8, opacity: 0.4 }} />
-                          No notifications yet
-                        </div>
-                      ) : notifications.map(n => (
-                        <div
-                          key={n.id}
-                          onClick={() => {
-                            if (n.data?.sender_id) { setPendingChatUserId(n.data.sender_id); setActiveTab('chat'); setShowNotifPanel(false); }
-                          }}
-                          style={{ padding: '12px 16px', borderBottom: '1px solid #f0f2f5', background: n.read ? '#fff' : '#f0f4ff', cursor: n.data?.sender_id ? 'pointer' : 'default', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                          <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#2b3d4f', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
-                            <i className="bi bi-chat-dots" style={{ fontSize: 14, color: '#fff' }} />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: 600, fontSize: 13, color: '#2c3e50', marginBottom: 2 }}>{n.title}</div>
-                            <div style={{ fontSize: 12, color: '#667781', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.message}</div>
-                            <div style={{ fontSize: 11, color: '#adb5bd', marginTop: 3 }}>{new Date(n.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                          </div>
-                          {!n.read && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#2b3d4f', flexShrink: 0, marginTop: 6 }} />}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+        <style>{`.main-content { margin-left: 0; } @media (min-width: 768px) { .main-content { margin-left: 260px; } }`}</style>
+        <div style={{ background: '#ffffff', borderBottom: '1px solid #e9ecef', height: 56, display: 'flex', alignItems: 'center', padding: '0 12px', gap: 8, position: 'relative', zIndex: 100 }}>
+          <button
+            className="d-md-none"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            style={{ background: 'none', border: 'none', color: '#2c3e50', padding: 4, flexShrink: 0, cursor: 'pointer' }}
+          >
+            <i className="bi bi-list" style={{ fontSize: 24 }}></i>
+          </button>
+          <span style={{ color: '#2c3e50', fontWeight: 700, flexGrow: 1, fontSize: 'clamp(12px, 3.2vw, 17px)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Employee Portal - {employee?.first_name?.toUpperCase()}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            <div ref={notifPanelRef} style={{ position: 'relative' }}>
+              <button
+                onClick={() => { setShowNotifPanel(p => !p); setNotifications(prev => prev.map(n => ({ ...n, read: true }))); }}
+                style={{ background: 'none', border: 'none', color: '#2c3e50', padding: 6, position: 'relative', cursor: 'pointer' }}
+              >
+                <i className="bi bi-bell" style={{ fontSize: 20 }}></i>
+                {unreadCount > 0 && (
+                  <span style={{ position: 'absolute', top: 2, right: 2, background: '#e74c3c', color: '#fff', borderRadius: '50%', fontSize: 9, width: 15, height: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
                 )}
-              </div>
-
-              <button className="nav-link btn btn-link" onClick={handleLogout} style={{ color: '#2c3e50', textDecoration: 'none', cursor: 'pointer' }}>
-                <i className="bi bi-person-circle me-2"></i>{employee?.username?.toUpperCase()}
               </button>
+              {showNotifPanel && (
+                <div style={{ position: 'absolute', right: 0, top: '110%', width: 'min(320px, 90vw)', background: '#fff', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.15)', zIndex: 2000, overflow: 'hidden' }}>
+                  <div style={{ background: '#2b3d4f', color: '#fff', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontWeight: 600, fontSize: 14 }}>Notifications</span>
+                    {notifications.length > 0 && (
+                      <button onClick={() => setNotifications([])} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', fontSize: 12, cursor: 'pointer' }}>Clear all</button>
+                    )}
+                  </div>
+                  <div style={{ maxHeight: 360, overflowY: 'auto' }}>
+                    {notifications.length === 0 ? (
+                      <div style={{ padding: '32px 16px', textAlign: 'center', color: '#8696a0', fontSize: 13 }}>
+                        <i className="bi bi-bell-slash" style={{ fontSize: 28, display: 'block', marginBottom: 8, opacity: 0.4 }} />
+                        No notifications yet
+                      </div>
+                    ) : notifications.map(n => (
+                      <div
+                        key={n.id}
+                        onClick={() => { if (n.data?.sender_id) { setPendingChatUserId(n.data.sender_id); setActiveTab('chat'); setShowNotifPanel(false); } }}
+                        style={{ padding: '12px 16px', borderBottom: '1px solid #f0f2f5', background: n.read ? '#fff' : '#f0f4ff', cursor: n.data?.sender_id ? 'pointer' : 'default', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                        <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#2b3d4f', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                          <i className="bi bi-chat-dots" style={{ fontSize: 14, color: '#fff' }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: 13, color: '#2c3e50', marginBottom: 2 }}>{n.title}</div>
+                          <div style={{ fontSize: 12, color: '#667781', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.message}</div>
+                          <div style={{ fontSize: 11, color: '#adb5bd', marginTop: 3 }}>{new Date(n.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                        </div>
+                        {!n.read && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#2b3d4f', flexShrink: 0, marginTop: 6 }} />}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
+            <button
+              onClick={handleLogout}
+              style={{ background: 'none', border: 'none', color: '#2c3e50', padding: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+            >
+              <i className="bi bi-person-circle" style={{ fontSize: 20 }}></i>
+              <span className="d-none d-sm-inline" style={{ fontSize: 13, fontWeight: 600 }}>{employee?.username?.toUpperCase()}</span>
+            </button>
           </div>
-        </nav>
+        </div>
         
         <div className="container-fluid" style={{ maxWidth: '100%', overflowX: 'hidden', padding: activeTab === 'chat' ? '0' : '1.5rem' }}>
           {activeTab !== 'chat' && (
             <div className="row mb-4 g-3">
-              <div className="col-12 col-md-6">
+              <div className="col-6 col-md-6">
                 <div className="card shadow-sm border-0" style={{ background: '#ffffff' }}>
                   <div className="card-body text-center">
                     <i className="bi bi-box-arrow-in-right fs-1 mb-2" style={{ color: '#2c3e50' }}></i>
@@ -526,7 +522,7 @@ export function EmployeeDashboard() {
                   </div>
                 </div>
               </div>
-              <div className="col-12 col-md-6">
+              <div className="col-6 col-md-6">
                 <div className="card shadow-sm border-0" style={{ background: '#ffffff' }}>
                   <div className="card-body text-center">
                     <i className="bi bi-box-arrow-right fs-1 mb-2" style={{ color: '#2c3e50' }}></i>
