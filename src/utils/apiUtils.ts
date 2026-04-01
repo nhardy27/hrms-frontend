@@ -77,20 +77,17 @@ export const makeAuthenticatedRequest = async (url: string, options: RequestInit
 
 export const fetchAllPages = async (baseUrl: string) => {
   let allData: any[] = [];
-  let nextUrl = baseUrl;
-  
-  while (nextUrl) {
-    const response = await makeAuthenticatedRequest(nextUrl);
-    
-    if (response.ok) {
-      const data = await response.json();
-      allData = [...allData, ...(data.results || [])];
-      nextUrl = data.next;
-    } else {
-      console.error('Failed to fetch data:', response.status);
-      break;
-    }
+  let page = 1;
+
+  while (true) {
+    const sep = baseUrl.includes('?') ? '&' : '?';
+    const response = await makeAuthenticatedRequest(`${baseUrl}${sep}page=${page}&page_size=100`);
+    if (!response.ok) break;
+    const data = await response.json();
+    allData = [...allData, ...(data.results || [])];
+    if (!data.next) break;
+    page++;
   }
-  
+
   return allData;
 };

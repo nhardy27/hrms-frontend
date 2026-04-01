@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import config from '../../../config/global.json';
 import { makeAuthenticatedRequest } from '../../../utils/apiUtils';
 
-type ChatType = 'private' | 'department' | 'designation';
+type ChatType = 'private';
 
 interface Message {
   id?: number;
@@ -31,13 +31,15 @@ interface ChatTabProps {
     designation?: string;
     designation_id?: string;
   } | null;
+  pendingChatUserId?: number | null;
+  onPendingChatHandled?: () => void;
 }
 
 const getInitials = (name: string) =>
   name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
 const avatarColor = (name: string) => {
-  const colors = ['#4f6d7a', '#c0392b', '#16a085', '#8e44ad', '#d35400', '#2980b9', '#27ae60'];
+  const colors = ['#3b5998', '#e74c3c', '#16a085', '#8e44ad', '#e67e22', '#2980b9', '#27ae60'];
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
   return colors[Math.abs(hash) % colors.length];
@@ -57,8 +59,28 @@ const formatDateLabel = (ts?: string) => {
   return d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-export function ChatTab({ employee }: ChatTabProps) {
-  const [chatType, setChatType] = useState<ChatType>('private');
+// ── Design tokens ──
+const C = {
+  sidebarBg: '#1e2d3d',
+  sidebarHover: '#263545',
+  sidebarActive: '#2b3d4f',
+  sidebarBorder: 'rgba(255,255,255,0.07)',
+  headerBg: '#2b3d4f',
+  chatBg: '#f4f6f9',
+  myBubble: '#2b3d4f',
+  myBubbleText: '#ffffff',
+  theirBubble: '#ffffff',
+  theirBubbleText: '#1a2533',
+  inputBg: '#ffffff',
+  inputBorder: '#e2e8f0',
+  accent: '#3d8ef8',
+  mutedText: 'rgba(255,255,255,0.55)',
+  datePill: 'rgba(43,61,79,0.12)',
+  datePillText: '#4a6080',
+};
+
+export function ChatTab({ employee, pendingChatUserId, onPendingChatHandled }: ChatTabProps) {
+  const [chatType] = useState<ChatType>('private');
   const [roomId, setRoomId] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -67,7 +89,7 @@ export function ChatTab({ employee }: ChatTabProps) {
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeOption | null>(null);
   const [search, setSearch] = useState('');
-  const [showChat, setShowChat] = useState(false); // mobile: show chat panel
+  const [showChat, setShowChat] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -93,8 +115,14 @@ export function ChatTab({ employee }: ChatTabProps) {
 
   const connect = useCallback((rid: string, type: ChatType) => {
     if (!rid.trim()) return;
-    disconnect();
+    if (wsRef.current) {
+      wsRef.current.onclose = null;
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    setConnected(false);
     setConnecting(true);
+    setMessages([]);
     const token = localStorage.getItem('token');
     const ws = new WebSocket(`${wsHost}/ws/chat/${type}/${rid}/?token=${token}`);
     wsRef.current = ws;
@@ -108,25 +136,21 @@ export function ChatTab({ employee }: ChatTabProps) {
         else if (data.type === 'message') setMessages(prev => [...prev, data]);
       } catch { /* ignore */ }
     };
-  }, [wsHost, disconnect]);
+  }, [wsHost]);
 
   useEffect(() => {
     disconnect();
     setSelectedEmployee(null);
     setSearch('');
     setShowChat(false);
-    if (chatType === 'department' && employee?.department_id) {
-      setRoomId(employee.department_id);
-      connect(employee.department_id, 'department');
-      setShowChat(true);
-    } else if (chatType === 'designation' && employee?.designation_id) {
-      setRoomId(employee.designation_id);
-      connect(employee.designation_id, 'designation');
-      setShowChat(true);
-    } else {
-      setRoomId('');
-    }
+    setRoomId('');
   }, [chatType]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!pendingChatUserId || employees.length === 0) return;
+    const emp = employees.find(e => e.user_id === pendingChatUserId);
+    if (emp) { setSelectedEmployee(emp); onPendingChatHandled?.(); }
+  }, [pendingChatUserId, employees]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (chatType === 'private' && selectedEmployee) {
@@ -143,16 +167,22 @@ export function ChatTab({ employee }: ChatTabProps) {
 
   useEffect(() => () => disconnect(), [disconnect]);
 
-  const sendMessage = () => {
+  const sendMessage = useCallback(() => {
     if (!input.trim() || wsRef.current?.readyState !== WebSocket.OPEN) return;
     wsRef.current.send(JSON.stringify({ message: input.trim() }));
     setInput('');
-  };
+  }, [input]);
 
-  const filteredEmployees = employees.filter(e =>
-    e.user_id !== Number(employee?.id) &&
-    `${e.name} ${e.username} ${e.department ?? ''} ${e.designation ?? ''}`.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredEmployees = employees
+    .filter(e =>
+      e.user_id !== Number(employee?.id) &&
+      `${e.name} ${e.username} ${e.department ?? ''} ${e.designation ?? ''}`.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (a.user_id === selectedEmployee?.user_id) return -1;
+      if (b.user_id === selectedEmployee?.user_id) return 1;
+      return 0;
+    });
 
   const messageGroups: { dateLabel: string; msgs: Message[] }[] = [];
   messages.forEach(msg => {
@@ -163,75 +193,193 @@ export function ChatTab({ employee }: ChatTabProps) {
   });
 
   const myId = Number(employee?.id);
+  const chatTitle = selectedEmployee?.name || '';
+  const chatSubtitle = [selectedEmployee?.designation, selectedEmployee?.department].filter(Boolean).join(' · ');
 
-  const chatTitle =
-    chatType === 'private'
-      ? selectedEmployee?.name || ''
-      : chatType === 'department'
-      ? `${employee?.department_name || 'Department'} Group`
-      : `${employee?.designation || 'Designation'} Group`;
+  // ── Sidebar header ──
+  const SidebarHeader = (
+    <div style={{ background: C.sidebarBg, padding: '0 16px', height: 60, display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, borderBottom: `1px solid ${C.sidebarBorder}` }}>
+      <div style={{ width: 34, height: 34, borderRadius: 10, background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <i className="bi bi-chat-square-text-fill" style={{ fontSize: 15, color: '#fff' }} />
+      </div>
+      <span style={{ color: '#fff', fontWeight: 700, fontSize: 16, letterSpacing: 0.2 }}>Messages</span>
+    </div>
+  );
 
-  const chatSubtitle =
-    chatType === 'private'
-      ? [selectedEmployee?.designation, selectedEmployee?.department].filter(Boolean).join(' · ')
-      : chatType === 'department' ? 'Department group' : 'Designation group';
+  // ── Search bar ──
+  const SearchBar = (
+    <div style={{ padding: '10px 12px', background: C.sidebarBg, flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.08)', borderRadius: 8, padding: '0 10px', height: 34, gap: 8 }}>
+        <i className="bi bi-search" style={{ fontSize: 13, color: C.mutedText, flexShrink: 0 }} />
+        <input
+          ref={searchRef}
+          type="text"
+          style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: '#fff', minWidth: 0 }}
+          placeholder="Search employees..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        {search && (
+          <button style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+            onClick={() => { setSearch(''); searchRef.current?.focus(); }}>
+            <i className="bi bi-x" style={{ fontSize: 15, color: C.mutedText }} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
 
-  // ── Shared: Chat messages + input ──
+  // ── Contact list ──
+  const ContactList = (
+    <div className="d-flex flex-column" style={{ height: '100%', background: C.sidebarBg }}>
+      {SidebarHeader}
+      {SearchBar}
+      <div className="overflow-auto flex-grow-1">
+        {filteredEmployees.length === 0 && (
+          <div style={{ padding: '40px 16px', textAlign: 'center', color: C.mutedText }}>
+            <i className="bi bi-people" style={{ fontSize: 32, display: 'block', marginBottom: 8, opacity: 0.3 }} />
+            <span style={{ fontSize: 13 }}>{search ? 'No results' : 'No contacts'}</span>
+          </div>
+        )}
+        {filteredEmployees.map(emp => {
+          const isActive = selectedEmployee?.user_id === emp.user_id;
+          return (
+            <button
+              key={emp.user_id}
+              onClick={() => setSelectedEmployee(emp)}
+              style={{
+                width: '100%', border: 'none', textAlign: 'left', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '10px 14px',
+                background: isActive ? C.sidebarActive : 'transparent',
+                borderLeft: isActive ? `3px solid ${C.accent}` : '3px solid transparent',
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = C.sidebarHover; }}
+              onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+            >
+              <div style={{
+                width: 42, height: 42, borderRadius: 12, flexShrink: 0,
+                background: avatarColor(emp.name),
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#fff', fontWeight: 700, fontSize: 14, letterSpacing: 0.5
+              }}>
+                {getInitials(emp.name)}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: '#fff', fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {emp.name}
+                </div>
+                <div style={{ color: C.mutedText, fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 2 }}>
+                  {[emp.designation, emp.department].filter(Boolean).join(' · ') || emp.username}
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  // ── Chat header ──
+  const ChatHeader = (
+    <div style={{ background: C.headerBg, padding: '0 16px', minHeight: 60, display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }}>
+      <button
+        className="d-md-none"
+        style={{ background: 'none', border: 'none', color: '#fff', padding: '4px 8px 4px 0', cursor: 'pointer', flexShrink: 0 }}
+        onClick={() => { setShowChat(false); disconnect(); setSelectedEmployee(null); }}
+      >
+        <i className="bi bi-arrow-left" style={{ fontSize: 18 }} />
+      </button>
+
+      <div style={{
+        width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+        background: avatarColor(chatTitle || 'U'),
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: '#fff', fontWeight: 700, fontSize: 14
+      }}>
+        {selectedEmployee ? getInitials(selectedEmployee.name) : <i className="bi bi-person" />}
+      </div>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ color: '#fff', fontWeight: 700, fontSize: 15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {chatTitle}
+        </div>
+        <div style={{ fontSize: 12, marginTop: 1, display: 'flex', alignItems: 'center', gap: 5 }}>
+          {connecting ? (
+            <><span className="spinner-border spinner-border-sm" style={{ width: 10, height: 10, borderWidth: 2, color: C.mutedText }} /><span style={{ color: C.mutedText }}>Connecting...</span></>
+          ) : connected ? (
+            <span style={{ color: 'rgba(255,255,255,0.6)' }}>{chatSubtitle}</span>
+          ) : (
+            <span style={{ color: C.mutedText }}>{chatSubtitle}</span>
+          )}
+        </div>
+      </div>
+
+      {!connecting && selectedEmployee && !connected && (
+        <button style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer', padding: '6px 10px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 5 }}
+          onClick={() => connect(roomId, 'private')}>
+          <i className="bi bi-arrow-clockwise" style={{ fontSize: 14 }} />
+          <span>Retry</span>
+        </button>
+      )}
+    </div>
+  );
+
+  // ── Messages area ──
   const MessagesArea = (
     <>
-      <div className="flex-grow-1 overflow-auto px-2 px-md-3 py-2" style={{ background: '#efeae2' }}>
+      <div className="flex-grow-1 overflow-auto" style={{ background: C.chatBg, padding: '16px 20px' }}>
         {!connected && !connecting && (
-          <div className="d-flex flex-column align-items-center justify-content-center h-100 text-muted">
-            <i className="bi bi-chat-dots" style={{ fontSize: 40, opacity: 0.2 }} />
-            <div className="mt-2 small text-center px-4">
-              {chatType === 'private' ? 'Select a contact to start chatting' : 'Could not connect.'}
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+            <div style={{ width: 64, height: 64, borderRadius: 20, background: '#e8edf3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <i className="bi bi-chat-square-dots" style={{ fontSize: 28, color: '#94a3b8' }} />
             </div>
+            <span style={{ color: '#94a3b8', fontSize: 14 }}>Select a contact to start chatting</span>
           </div>
         )}
         {connecting && (
-          <div className="d-flex align-items-center justify-content-center h-100 text-muted">
-            <span className="spinner-border spinner-border-sm me-2" />
-            <span className="small">Connecting...</span>
+          <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+            <span className="spinner-border spinner-border-sm" style={{ color: C.headerBg }} />
+            <span style={{ color: '#64748b', fontSize: 14 }}>Connecting...</span>
           </div>
         )}
         {connected && messageGroups.length === 0 && (
-          <div className="d-flex flex-column align-items-center justify-content-center h-100 text-muted">
-            <i className="bi bi-lock" style={{ fontSize: 18, opacity: 0.3 }} />
-            <div className="mt-1 text-center px-4" style={{ fontSize: 12, opacity: 0.5 }}>
-              Messages are end-to-end encrypted
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <div style={{ width: 56, height: 56, borderRadius: 18, background: '#e8edf3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <i className="bi bi-shield-lock" style={{ fontSize: 22, color: '#94a3b8' }} />
             </div>
+            <span style={{ color: '#94a3b8', fontSize: 13 }}>No messages yet. Say hello!</span>
           </div>
         )}
         {connected && messageGroups.map((group, gi) => (
           <div key={gi}>
-            {/* Date pill */}
-            <div className="d-flex justify-content-center my-3">
-              <span className="px-3 py-1 rounded-pill" style={{ background: '#d1f4cc', fontSize: 11, color: '#54656f' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', margin: '16px 0 12px' }}>
+              <span style={{ background: C.datePill, color: C.datePillText, fontSize: 11, fontWeight: 600, padding: '3px 12px', borderRadius: 20, letterSpacing: 0.3 }}>
                 {group.dateLabel}
               </span>
             </div>
             {group.msgs.map((msg, i) => {
               const isMine = msg.sender_id === myId;
-              const showName = !isMine && chatType !== 'private' &&
-                (i === 0 || group.msgs[i - 1]?.sender_id !== msg.sender_id);
               return (
-                <div key={i} className={`d-flex mb-1 ${isMine ? 'justify-content-end' : 'justify-content-start'}`}>
+                <div key={i} style={{ display: 'flex', justifyContent: isMine ? 'flex-end' : 'flex-start', marginBottom: 6 }}>
+                  {!isMine && (
+                    <div style={{ width: 30, height: 30, borderRadius: 9, background: avatarColor(msg.sender), display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 11, fontWeight: 700, flexShrink: 0, marginRight: 8, alignSelf: 'flex-end', marginBottom: 2 }}>
+                      {getInitials(msg.sender)}
+                    </div>
+                  )}
                   <div style={{
-                    maxWidth: 'min(80%, 400px)',
-                    background: isMine ? '#d9fdd3' : '#ffffff',
-                    borderRadius: isMine ? '8px 8px 0 8px' : '8px 8px 8px 0',
-                    padding: '6px 10px 4px',
-                    boxShadow: '0 1px 1px rgba(0,0,0,0.1)',
-                    wordBreak: 'break-word'
+                    maxWidth: 'min(72%, 420px)',
+                    background: isMine ? C.myBubble : C.theirBubble,
+                    color: isMine ? C.myBubbleText : C.theirBubbleText,
+                    borderRadius: isMine ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                    padding: '9px 13px 7px',
+                    boxShadow: isMine ? '0 2px 8px rgba(43,61,79,0.25)' : '0 1px 4px rgba(0,0,0,0.08)',
+                    wordBreak: 'break-word',
                   }}>
-                    {showName && (
-                      <div className="fw-semibold" style={{ fontSize: 12, color: avatarColor(msg.sender), marginBottom: 2 }}>
-                        {msg.sender}
-                      </div>
-                    )}
-                    <span style={{ fontSize: 14, color: '#111b21', lineHeight: 1.5 }}>{msg.message}</span>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 2 }}>
-                      <span style={{ fontSize: 10, color: '#667781' }}>{formatTime(msg.timestamp)}</span>
+                    <div style={{ fontSize: 14, lineHeight: 1.5 }}>{msg.message}</div>
+                    <div style={{ fontSize: 10, marginTop: 4, textAlign: 'right', opacity: isMine ? 0.6 : 0.45 }}>
+                      {formatTime(msg.timestamp)}
                     </div>
                   </div>
                 </div>
@@ -243,265 +391,84 @@ export function ChatTab({ employee }: ChatTabProps) {
       </div>
 
       {/* Input bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#f0f2f5', flexShrink: 0 }}>
+      <div style={{ background: '#fff', borderTop: `1px solid ${C.inputBorder}`, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
         <input
           ref={inputRef}
           type="text"
           style={{
-            flex: 1, border: 'none', outline: 'none', borderRadius: 24,
-            background: '#fff', fontSize: 15, padding: '10px 16px',
-            color: '#111b21', minWidth: 0
+            flex: 1, border: `1.5px solid ${connected ? C.inputBorder : '#e2e8f0'}`, outline: 'none',
+            borderRadius: 12, background: connected ? C.inputBg : '#f8fafc',
+            fontSize: 14, padding: '10px 14px', color: '#1a2533', minWidth: 0,
+            transition: 'border-color 0.2s',
           }}
-          placeholder="Type a message"
+          placeholder={connected ? 'Type a message...' : 'Not connected'}
           value={input}
           disabled={!connected}
           onChange={e => setInput(e.target.value)}
+          onFocus={e => { if (connected) e.target.style.borderColor = C.accent; }}
+          onBlur={e => { e.target.style.borderColor = C.inputBorder; }}
           onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
         />
         <button
-          style={{
-            width: 44, height: 44, borderRadius: '50%', border: 'none', flexShrink: 0,
-            background: connected && input.trim() ? '#25d366' : '#adb5bd',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: connected && input.trim() ? 'pointer' : 'default',
-            transition: 'background 0.2s'
-          }}
           onClick={sendMessage}
           disabled={!connected || !input.trim()}
+          style={{
+            width: 42, height: 42, borderRadius: 12, border: 'none', flexShrink: 0,
+            background: connected && input.trim() ? C.myBubble : '#e2e8f0',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: connected && input.trim() ? 'pointer' : 'default',
+            transition: 'background 0.2s, transform 0.1s',
+          }}
+          onMouseDown={e => { if (connected && input.trim()) (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.93)'; }}
+          onMouseUp={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'; }}
         >
-          <i className="bi bi-send-fill" style={{ fontSize: 16, color: '#fff' }} />
+          <i className="bi bi-send-fill" style={{ fontSize: 15, color: connected && input.trim() ? '#fff' : '#94a3b8', marginLeft: 2 }} />
         </button>
       </div>
     </>
   );
 
-  // ── Chat header ──
-  const ChatHeader = (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 10,
-      background: '#2b3d4f', padding: '8px 12px',
-      minHeight: 56, flexShrink: 0
-    }}>
-      <button
-        className="d-md-none"
-        style={{ background: 'none', border: 'none', color: '#fff', padding: '4px 6px 4px 0', cursor: 'pointer', flexShrink: 0 }}
-        onClick={() => { setShowChat(false); if (chatType === 'private') { disconnect(); setSelectedEmployee(null); } }}
-      >
-        <i className="bi bi-arrow-left" style={{ fontSize: 20 }} />
-      </button>
-
-      <div style={{
-        width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
-        background: avatarColor(chatTitle || 'G'),
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: '#fff', fontWeight: 700, fontSize: 14
-      }}>
-        {chatType === 'private'
-          ? (selectedEmployee ? getInitials(selectedEmployee.name) : <i className="bi bi-person" />)
-          : <i className={`bi ${chatType === 'department' ? 'bi-building' : 'bi-briefcase'}`} />}
+  // ── Empty right panel ──
+  const EmptyState = (
+    <div style={{ flex: 1, background: C.chatBg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+      <div style={{ width: 80, height: 80, borderRadius: 24, background: '#e8edf3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <i className="bi bi-chat-square-text" style={{ fontSize: 36, color: '#94a3b8' }} />
       </div>
-
-      <div style={{ flex: 1, overflow: 'hidden' }}>
-        <div style={{ color: '#fff', fontWeight: 600, fontSize: 15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {chatTitle}
-        </div>
-        <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {connecting ? 'connecting...' : chatSubtitle}
-        </div>
-      </div>
-
-      {!connecting && chatType === 'private' && selectedEmployee && !connected && (
-        <button style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', flexShrink: 0 }}
-          onClick={() => connect(roomId, 'private')}>
-          <i className="bi bi-arrow-clockwise" style={{ fontSize: 18 }} />
-        </button>
-      )}
-    </div>
-  );
-
-  // ── Contact list (private tab) ──
-  const ContactList = (
-    <div className="d-flex flex-column" style={{ height: '100%' }}>
-      {/* Search bar */}
-      <div style={{ background: '#f0f2f5', padding: '8px 12px', flexShrink: 0 }}>
-        <div style={{
-          display: 'flex', alignItems: 'center',
-          background: '#fff', borderRadius: 8,
-          padding: '0 12px', height: 36,
-          boxShadow: '0 1px 2px rgba(0,0,0,0.08)'
-        }}>
-          <i className="bi bi-search" style={{ fontSize: 14, color: '#8696a0', marginRight: 8, flexShrink: 0 }} />
-          <input
-            ref={searchRef}
-            type="text"
-            style={{
-              flex: 1, border: 'none', outline: 'none',
-              background: 'transparent', fontSize: 14,
-              color: '#111b21', minWidth: 0, height: '100%',
-              padding: 0, lineHeight: '36px'
-            }}
-            placeholder="Search name, department..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          {search && (
-            <button
-              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center' }}
-              onClick={() => { setSearch(''); searchRef.current?.focus(); }}
-            >
-              <i className="bi bi-x-circle-fill" style={{ fontSize: 15, color: '#8696a0' }} />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Contacts */}
-      <div className="overflow-auto flex-grow-1" style={{ background: '#fff' }}>
-        {filteredEmployees.length === 0 && (
-          <div className="d-flex flex-column align-items-center justify-content-center py-5 text-muted">
-            <i className="bi bi-people" style={{ fontSize: 36, opacity: 0.15 }} />
-            <div className="mt-2 small">{search ? 'No results' : 'No contacts'}</div>
-          </div>
-        )}
-        {filteredEmployees.map((emp, idx) => (
-          <button
-            key={emp.user_id}
-            className="w-100 border-0 text-start d-flex align-items-center gap-3 px-3"
-            style={{
-              background: selectedEmployee?.user_id === emp.user_id ? '#f0f2f5' : '#fff',
-              padding: '12px 16px',
-              borderBottom: idx < filteredEmployees.length - 1 ? '1px solid #f0f2f5' : 'none',
-              cursor: 'pointer'
-            }}
-            onClick={() => setSelectedEmployee(emp)}
-          >
-            <div className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0"
-              style={{ width: 48, height: 48, fontSize: 16, background: avatarColor(emp.name) }}>
-              {getInitials(emp.name)}
-            </div>
-            <div className="flex-grow-1 overflow-hidden" style={{ borderBottom: '1px solid #f0f2f5', paddingBottom: 12, paddingTop: 2 }}>
-              <div className="fw-semibold text-truncate" style={{ fontSize: 15, color: '#111b21' }}>{emp.name}</div>
-              <div className="text-truncate" style={{ fontSize: 13, color: '#667781' }}>
-                {[emp.designation, emp.department].filter(Boolean).join(' · ')}
-              </div>
-            </div>
-          </button>
-        ))}
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ color: '#334155', fontWeight: 700, fontSize: 17, marginBottom: 4 }}>HR Messenger</div>
+        <div style={{ color: '#94a3b8', fontSize: 13 }}>Select a colleague to start a conversation</div>
       </div>
     </div>
   );
 
   return (
     <>
-      {/* ════════════════════════════════════
-          MOBILE: full-screen fixed overlay
-          ════════════════════════════════════ */}
-      <div className="d-md-none" style={{ position: 'fixed', inset: 0, zIndex: 1050, display: 'flex', flexDirection: 'column', background: '#fff' }}>
-
-        {/* Tab bar header */}
-        {!showChat && (
-          <div style={{ background: '#2b3d4f', flexShrink: 0 }}>
-            {/* Title row */}
-            <div className="d-flex align-items-center px-3" style={{ height: 56 }}>
-              <span className="text-white fw-semibold" style={{ fontSize: 20, flex: 1 }}>Chats</span>
-            </div>
-            {/* Tab row */}
-            <div className="d-flex" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-              {(['private', 'department', 'designation'] as ChatType[]).map(t => (
-                <button key={t} onClick={() => setChatType(t)}
-                  className="btn flex-fill d-flex flex-column align-items-center justify-content-center py-2 gap-1"
-                  style={{
-                    borderRadius: 0, border: 'none',
-                    borderBottom: chatType === t ? '2px solid #25d366' : '2px solid transparent',
-                    background: 'transparent',
-                    color: chatType === t ? '#25d366' : 'rgba(255,255,255,0.55)',
-                    fontSize: 10, fontWeight: chatType === t ? 600 : 400,
-                    transition: 'all 0.15s'
-                  }}>
-                  <i className={`bi ${
-                    t === 'private' ? 'bi-person-fill' :
-                    t === 'department' ? 'bi-building-fill' : 'bi-briefcase-fill'
-                  }`} style={{ fontSize: 20 }} />
-                  <span style={{ textTransform: 'capitalize', letterSpacing: 0.2 }}>
-                    {t === 'private' ? 'Direct' : t === 'department' ? 'Department' : 'Designation'}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Private: show contact list or chat */}
-        {chatType === 'private' && !showChat && ContactList}
-        {chatType === 'private' && showChat && (
-          <div className="d-flex flex-column flex-grow-1 overflow-hidden">
-            {ChatHeader}
-            {MessagesArea}
-          </div>
-        )}
-
-        {/* Group: always show chat */}
-        {chatType !== 'private' && (
-          <div className="d-flex flex-column flex-grow-1 overflow-hidden">
+      {/* ── MOBILE ── */}
+      <div className="d-md-none" style={{ position: 'fixed', inset: 0, zIndex: 1050, display: 'flex', flexDirection: 'column' }}>
+        {!showChat && ContactList}
+        {showChat && (
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
             {ChatHeader}
             {MessagesArea}
           </div>
         )}
       </div>
 
-      {/* ════════════════════════════════════
-          DESKTOP: inline two-panel card
-          ════════════════════════════════════ */}
-      <div className="d-none d-md-flex card border-0 shadow-sm overflow-hidden"
-        style={{ height: 'calc(100vh - 130px)', minHeight: 500, borderRadius: 12, flexDirection: 'column' }}>
-
-        {/* Tab bar */}
-        <div className="d-flex flex-shrink-0" style={{ background: '#2b3d4f' }}>
-          {(['private', 'department', 'designation'] as ChatType[]).map(t => (
-            <button key={t} onClick={() => setChatType(t)}
-              className="btn flex-fill d-flex align-items-center justify-content-center gap-2 py-2"
-              style={{
-                borderRadius: 0, border: 'none',
-                borderBottom: chatType === t ? '2px solid #fff' : '2px solid transparent',
-                background: 'transparent',
-                color: chatType === t ? '#fff' : 'rgba(255,255,255,0.5)',
-                fontSize: 13, fontWeight: chatType === t ? 600 : 400
-              }}>
-              <i className={`bi ${t === 'private' ? 'bi-person' : t === 'department' ? 'bi-building' : 'bi-briefcase'}`} />
-              <span style={{ textTransform: 'capitalize' }}>{t}</span>
-            </button>
-          ))}
+      {/* ── DESKTOP ── */}
+      <div className="d-none d-md-flex" style={{
+        height: 'calc(100vh - 130px)', minHeight: 500,
+        borderRadius: 16, overflow: 'hidden',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.10)',
+        border: '1px solid #e2e8f0',
+      }}>
+        {/* Left sidebar */}
+        <div style={{ width: 280, flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {ContactList}
         </div>
 
-        {/* Body */}
-        <div className="d-flex flex-grow-1 overflow-hidden">
-          {chatType === 'private' && (
-            <>
-              {/* Left: contact list */}
-              <div className="flex-shrink-0 border-end d-flex flex-column" style={{ width: 280 }}>
-                {ContactList}
-              </div>
-              {/* Right: chat */}
-              <div className="flex-grow-1 d-flex flex-column overflow-hidden">
-                {selectedEmployee
-                  ? <>{ChatHeader}{MessagesArea}</>
-                  : (
-                    <div className="d-flex flex-column align-items-center justify-content-center h-100 text-muted"
-                      style={{ background: '#f0f2f5' }}>
-                      <i className="bi bi-chat-dots" style={{ fontSize: 48, opacity: 0.15 }} />
-                      <div className="mt-2 small">Select a contact to start chatting</div>
-                    </div>
-                  )
-                }
-              </div>
-            </>
-          )}
-          {chatType !== 'private' && (
-            <div className="flex-grow-1 d-flex flex-column overflow-hidden">
-              {ChatHeader}
-              {MessagesArea}
-            </div>
-          )}
+        {/* Right panel */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {selectedEmployee ? <>{ChatHeader}{MessagesArea}</> : EmptyState}
         </div>
       </div>
     </>

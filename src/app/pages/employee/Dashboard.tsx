@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import toast, { Toaster } from 'react-hot-toast';
 import config from "../../../config/global.json";
@@ -20,8 +20,16 @@ export function EmployeeDashboard() {
   const [todayAttendance, setTodayAttendance] = useState<Attendance | null>(null);
   const [hasCheckedOut, setHasCheckedOut] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
+  const [pendingChatUserId, setPendingChatUserId] = useState<number | null>(null);
   const [attendanceStatusId, setAttendanceStatusId] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  interface Notification { id: number; title: string; message: string; data: any; read: boolean; ts: string; }
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [showNotifPanel, setShowNotifPanel] = useState(false);
+  const notifWsRef = useRef<WebSocket | null>(null);
+  const notifPanelRef = useRef<HTMLDivElement>(null);
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -237,7 +245,95 @@ export function EmployeeDashboard() {
       console.error('Error fetching leave data:', error);
     }
   };
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let destroyed = false;
+
+    const wsHost = (config as any).ws?.host ||
+      config.api.host.replace('https://', 'wss://').replace('http://', 'ws://');
+
+    const connectNotifWs = async () => {
+      if (destroyed) return;
+      // Always get a fresh/valid token before connecting
+      const { refreshToken: doRefresh } = await import('../../../utils/apiUtils');
+      let token = localStorage.getItem('token');
+      if (!token) return;
+      // Check expiry and refresh if needed
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        if (payload.exp * 1000 < Date.now() + 5000) {
+          token = await doRefresh();
+        }
+      } catch { token = await doRefresh(); }
+      if (!token || destroyed) return;
+
+      ws = new WebSocket(`${wsHost}/ws/notifications/?token=${token}`);
+      notifWsRef.current = ws;
+
+      ws.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.type === 'notification') {
+            const notif: Notification = { id: Date.now(), title: data.title, message: data.message, data: data.data, read: false, ts: new Date().toISOString() };
+            setNotifications(prev => [notif, ...prev]);
+            const senderId: number | null = data.data?.sender_id ?? null;
+            toast.custom((t) => (
+              <div
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  if (senderId) { setPendingChatUserId(senderId); setActiveTab('chat'); }
+                }}
+                style={{ background: '#2b3d4f', color: '#fff', borderRadius: 10, padding: '12px 16px', minWidth: 260, boxShadow: '0 4px 16px rgba(0,0,0,0.18)', opacity: t.visible ? 1 : 0, transition: 'opacity 0.3s', cursor: senderId ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <i className="bi bi-chat-dots" style={{ fontSize: 16 }} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>{data.title}</div>
+                  <div style={{ fontSize: 13, opacity: 0.85, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{data.message}</div>
+                  {senderId && <div style={{ fontSize: 11, opacity: 0.55, marginTop: 2 }}>Tap to open chat</div>}
+                </div>
+              </div>
+            ), { duration: 5000, position: 'top-right' });
+          }
+          // type === 'error' means token was rejected — reconnect with fresh token
+          if (data.type === 'error') {
+            ws?.close();
+          }
+        } catch { /* ignore */ }
+      };
+
+      ws.onclose = () => {
+        if (!destroyed) {
+          // Reconnect after 3s
+          reconnectTimer = setTimeout(connectNotifWs, 3000);
+        }
+      };
+
+      ws.onerror = () => { ws?.close(); };
+    };
+
+    connectNotifWs();
+    return () => {
+      destroyed = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      ws?.close();
+      notifWsRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (notifPanelRef.current && !notifPanelRef.current.contains(e.target as Node)) {
+        setShowNotifPanel(false);
+      }
+    };
+    if (showNotifPanel) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showNotifPanel]);
+
   const handleLogout = () => {
+    notifWsRef.current?.close();
     localStorage.clear();
     navigate('/login');
   };
@@ -351,7 +447,59 @@ export function EmployeeDashboard() {
               <i className="bi bi-list fs-4"></i>
             </button>
             <span className="navbar-brand fw-bold" style={{ color: '#2c3e50' }}>Employee Portal - {employee?.first_name?.toUpperCase()}</span>
-            <div className="navbar-nav ms-auto">
+            <div className="navbar-nav ms-auto d-flex align-items-center gap-2">
+              {/* Notification Bell */}
+              <div ref={notifPanelRef} style={{ position: 'relative' }}>
+                <button
+                  className="btn btn-link"
+                  style={{ color: '#2c3e50', textDecoration: 'none', position: 'relative', padding: '4px 8px' }}
+                  onClick={() => { setShowNotifPanel(p => !p); setNotifications(prev => prev.map(n => ({ ...n, read: true }))); }}
+                >
+                  <i className="bi bi-bell fs-5"></i>
+                  {unreadCount > 0 && (
+                    <span style={{ position: 'absolute', top: 0, right: 2, background: '#e74c3c', color: '#fff', borderRadius: '50%', fontSize: 10, width: 17, height: 17, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {showNotifPanel && (
+                  <div style={{ position: 'absolute', right: 0, top: '110%', width: 320, background: '#fff', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.15)', zIndex: 2000, overflow: 'hidden' }}>
+                    <div style={{ background: '#2b3d4f', color: '#fff', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontWeight: 600, fontSize: 14 }}>Notifications</span>
+                      {notifications.length > 0 && (
+                        <button onClick={() => setNotifications([])} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', fontSize: 12, cursor: 'pointer' }}>Clear all</button>
+                      )}
+                    </div>
+                    <div style={{ maxHeight: 360, overflowY: 'auto' }}>
+                      {notifications.length === 0 ? (
+                        <div style={{ padding: '32px 16px', textAlign: 'center', color: '#8696a0', fontSize: 13 }}>
+                          <i className="bi bi-bell-slash" style={{ fontSize: 28, display: 'block', marginBottom: 8, opacity: 0.4 }} />
+                          No notifications yet
+                        </div>
+                      ) : notifications.map(n => (
+                        <div
+                          key={n.id}
+                          onClick={() => {
+                            if (n.data?.sender_id) { setPendingChatUserId(n.data.sender_id); setActiveTab('chat'); setShowNotifPanel(false); }
+                          }}
+                          style={{ padding: '12px 16px', borderBottom: '1px solid #f0f2f5', background: n.read ? '#fff' : '#f0f4ff', cursor: n.data?.sender_id ? 'pointer' : 'default', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                          <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#2b3d4f', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                            <i className="bi bi-chat-dots" style={{ fontSize: 14, color: '#fff' }} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, fontSize: 13, color: '#2c3e50', marginBottom: 2 }}>{n.title}</div>
+                            <div style={{ fontSize: 12, color: '#667781', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.message}</div>
+                            <div style={{ fontSize: 11, color: '#adb5bd', marginTop: 3 }}>{new Date(n.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                          </div>
+                          {!n.read && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#2b3d4f', flexShrink: 0, marginTop: 6 }} />}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <button className="nav-link btn btn-link" onClick={handleLogout} style={{ color: '#2c3e50', textDecoration: 'none', cursor: 'pointer' }}>
                 <i className="bi bi-person-circle me-2"></i>{employee?.username?.toUpperCase()}
               </button>
@@ -401,7 +549,7 @@ export function EmployeeDashboard() {
           {activeTab === 'attendance' && <AttendanceTab attendances={attendances} />}
           {activeTab === 'leaves' && <LeavesTab leaves={leaves} onLeaveApplied={fetchLeaveData} />}
           {activeTab === 'salary' && <SalaryTab />}
-          {activeTab === 'chat' && <ChatTab employee={employee} />}
+          {activeTab === 'chat' && <ChatTab employee={employee} pendingChatUserId={pendingChatUserId} onPendingChatHandled={() => setPendingChatUserId(null)} />}
         </div>
       </div>
     </div>

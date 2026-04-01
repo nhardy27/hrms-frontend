@@ -78,25 +78,21 @@ export function EmployeeForm() {
   };
 
   useEffect(() => {
-    fetchDepartments();
-    fetchEmployeeRole();
-    
-    const handleDepartmentChange = () => {
-      fetchDepartments().then(() => {
-        if (isEdit) fetchEmployee();
-      });
+    const init = async () => {
+      await fetchDepartments();
+      fetchEmployeeRole();
+      if (isEdit) await fetchEmployee();
+      else generateEmployeeCode();
     };
-    
+    init();
+
+    const handleDepartmentChange = async () => {
+      await fetchDepartments();
+      if (isEdit) await fetchEmployee();
+    };
+
     window.addEventListener('departmentChanged', handleDepartmentChange);
     return () => window.removeEventListener('departmentChanged', handleDepartmentChange);
-  }, []);
-
-  useEffect(() => {
-    if (isEdit) {
-      fetchEmployee();
-    } else {
-      generateEmployeeCode();
-    }
   }, [id]);
 
   const fetchEmployeeRole = async () => {
@@ -135,7 +131,15 @@ export function EmployeeForm() {
       const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.user}${id}/`);
       if (response.ok) {
         const employee: any = await response.json();
-        
+
+        // fetch designations first, then set both states together
+        let filtered: Designation[] = [];
+        if (employee.department) {
+          const all = await fetchAllPages(`${config.api.host}${config.api.designation}`);
+          filtered = all.filter((d: Designation) => String(d.department) === String(employee.department) && d.status !== false);
+        }
+
+        setDesignations(filtered);
         setFormData({
           emp_code: employee.emp_code,
           username: employee.username || "",
@@ -157,7 +161,6 @@ export function EmployeeForm() {
           hra: employee.hra || "",
           allowance: employee.allowance || "",
         });
-        if (employee.department) fetchDesignationsByDepartment(employee.department);
       }
     } catch (error) {
       // Error fetching employee

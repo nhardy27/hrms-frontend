@@ -146,6 +146,7 @@ export function EmployeeList() {
         }
       }
       
+      allData.sort((a, b) => (a.emp_code || '').localeCompare(b.emp_code || '', undefined, { numeric: true }));
       setAllEmployees(allData);
       setEmployees(allData);
       setTotalCount(allData.length);
