@@ -6,12 +6,12 @@ import { makeAuthenticatedRequest } from "../../../utils/apiUtils";
 import { AdminLayout } from "../../components/AdminLayout";
 import { LoadingAnimation } from "../../components/LoadingAnimation";
 
-const STAT_CARDS = (stats: ReturnType<typeof defaultStats>) => [
-  { title: "Total Departments", value: stats.totalDepartments, icon: "bi-building",        color: "#3498db", link: "/departments" },
-  { title: "Total Employees",   value: stats.totalEmployees,   icon: "bi-people",           color: "#9b59b6", link: "/employees" },
-  { title: "Present Today",     value: stats.presentToday,     icon: "bi-person-check",     color: "#2ecc71", link: "/mark-attendance" },
-  { title: "Pending Leaves",    value: stats.pendingLeaves,    icon: "bi-calendar-x",       color: "#e74c3c", link: "/leave-management" },
-  { title: "Paid Salaries",     value: stats.paidSalaries,     icon: "bi-cash-coin",        color: "#27ae60", link: "/salary-management" },
+const STAT_CARDS = (stats: ReturnType<typeof defaultStats>, presentToday: number, absentToday: number) => [
+  { title: "Total Departments", value: stats.totalDepartments, icon: "bi-building",            color: "#3498db", link: "/departments" },
+  { title: "Total Employees",   value: stats.totalEmployees,   icon: "bi-people",               color: "#9b59b6", link: "/employees" },
+  { title: "Present Today",     value: presentToday,           icon: "bi-person-check",         color: "#2ecc71", link: "/mark-attendance" },
+  { title: "Absent Today",      value: absentToday,            icon: "bi-person-x",             color: "#e74c3c", link: "/mark-attendance" },
+  { title: "Paid Salaries",     value: stats.paidSalaries,     icon: "bi-cash-coin",            color: "#27ae60", link: "/salary-management" },
   { title: "Unpaid Salaries",   value: stats.unpaidSalaries,   icon: "bi-exclamation-triangle", color: "#f39c12", link: "/salary-management" },
 ];
 
@@ -23,12 +23,26 @@ const QUICK_ACTIONS = [
 ];
 
 function defaultStats() {
-  return { totalEmployees: 0, totalDepartments: 0, presentToday: 0, pendingLeaves: 0, paidSalaries: 0, unpaidSalaries: 0 };
+  return { totalEmployees: 0, totalDepartments: 0, pendingLeaves: 0, paidSalaries: 0, unpaidSalaries: 0 };
+}
+
+function calcHours(total_hours?: string, check_in?: string, check_out?: string): number {
+  if (total_hours) {
+    const [h, m, s] = total_hours.split(":").map(Number);
+    return h + m / 60 + s / 3600;
+  }
+  if (check_in && check_out) {
+    const diff = new Date(`1970-01-01T${check_out}`).getTime() - new Date(`1970-01-01T${check_in}`).getTime();
+    return diff / 3600000;
+  }
+  return 0;
 }
 
 export function AdminDashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState(defaultStats());
+  const [presentToday, setPresentToday] = useState(0);
+  const [absentToday, setAbsentToday] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -45,26 +59,38 @@ export function AdminDashboard() {
   const fetchDashboardStats = async () => {
     setLoading(true);
     try {
-      const response = await makeAuthenticatedRequest(`${config.api.host}${config.api.adminDashboard}`);
-      if (response.ok) {
-        const data = await response.json();
-        setStats({
-          totalEmployees:   data.total_employees       || 0,
-          totalDepartments: data.total_departments     || 0,
-          presentToday:     data.present_today         || 0,
-          pendingLeaves:    data.pending_leaves        || 0,
-          paidSalaries:     data.total_paid_salaries   || 0,
-          unpaidSalaries:   data.total_unpaid_salaries || 0,
-        });
-      } else { toast.error("Failed to load dashboard data"); }
+      const today = new Date().toISOString().split("T")[0];
+      const [dashRes, attRes] = await Promise.all([
+        makeAuthenticatedRequest(`${config.api.host}${config.api.adminDashboard}`),
+        makeAuthenticatedRequest(`${config.api.host}${config.api.attendance}?date=${today}&page_size=500`),
+      ]);
+
+      if (!dashRes.ok) { toast.error("Failed to load dashboard data"); return; }
+      const data = await dashRes.json();
+      const totalEmployees = data.total_employees || 0;
+      setStats({
+        totalEmployees,
+        totalDepartments: data.total_departments     || 0,
+        pendingLeaves:    data.pending_leaves        || 0,
+        paidSalaries:     data.total_paid_salaries   || 0,
+        unpaidSalaries:   data.total_unpaid_salaries || 0,
+      });
+
+      if (attRes.ok) {
+        const attData = await attRes.json();
+        const records: any[] = attData.results || [];
+        const present = records.filter(r => calcHours(r.total_hours, r.check_in, r.check_out) >= 7).length;
+        setPresentToday(present);
+        setAbsentToday(Math.max(0, totalEmployees - present));
+      } else {
+        setAbsentToday(totalEmployees);
+      }
     } catch { toast.error("Failed to load dashboard data"); }
     finally { setLoading(false); }
   };
 
-  const presentToday = Math.min(stats.presentToday, stats.totalEmployees);
   const attendancePct = stats.totalEmployees > 0
     ? Math.min(100, Math.round((presentToday / stats.totalEmployees) * 100)) : 0;
-  const absentToday = Math.max(0, stats.totalEmployees - presentToday);
 
   const totalSalaries = stats.paidSalaries + stats.unpaidSalaries;
   const paidPct = totalSalaries > 0 ? Math.round((stats.paidSalaries / totalSalaries) * 100) : 0;
@@ -80,7 +106,7 @@ export function AdminDashboard() {
 
         {/* ── Stat Cards ── */}
         <div className="row g-4">
-          {STAT_CARDS(stats).map((card, i) => (
+          {STAT_CARDS(stats, presentToday, absentToday).map((card, i) => (
             <div key={i} className="col-12 col-sm-6 col-lg-4">
               <div
                 className="card border-0 shadow-sm h-100"
@@ -128,9 +154,9 @@ export function AdminDashboard() {
                   </div>
                   <div className="d-flex flex-row flex-sm-column gap-4">
                     {[
-                      { label: "Present", value: presentToday,    color: "#2ecc71", icon: "bi-person-check" },
-                      { label: "Absent",  value: absentToday,      color: "#e74c3c", icon: "bi-person-x" },
-                      { label: "Total",   value: stats.totalEmployees,                      color: "#3498db", icon: "bi-people" },
+                      { label: "Present", value: presentToday,         color: "#2ecc71", icon: "bi-person-check" },
+                      { label: "Absent",  value: absentToday,          color: "#e74c3c", icon: "bi-person-x" },
+                      { label: "Total",   value: stats.totalEmployees, color: "#3498db", icon: "bi-people" },
                     ].map(item => (
                       <div key={item.label} className="d-flex align-items-center gap-3">
                         <div style={{ width: 44, height: 44, borderRadius: "50%", background: item.color, display: "flex", alignItems: "center", justifyContent: "center" }}>

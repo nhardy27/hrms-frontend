@@ -233,7 +233,7 @@ export function SalaryManagement() {
 
     setFormData(prev => ({
       ...prev,
-      absent_days:             absentDays,
+      absent_days:             Math.floor(absentDays),
       gross_salary:            grossSalary.toFixed(2),
       per_day_salary:          perDaySalary.toFixed(2),
       unpaid_leave_deduction:  unpaidLeaveDeduction.toFixed(2),

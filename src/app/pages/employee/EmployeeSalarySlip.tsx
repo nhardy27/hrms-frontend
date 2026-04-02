@@ -25,10 +25,13 @@ export function EmployeeSalarySlip() {
         setSalary(data);
         
         if (data.user?.id) {
-          const userResponse = await makeAuthenticatedRequest(`${config.api.host}${config.api.user}${data.user.id}/`);
+          const [userResponse, desigResponse] = await Promise.all([
+            makeAuthenticatedRequest(`${config.api.host}${config.api.user}${data.user.id}/`),
+            makeAuthenticatedRequest(`${config.api.host}${config.api.designation}`)
+          ]);
           if (userResponse.ok) {
             const userData = await userResponse.json();
-            
+
             // Fetch department name
             if (userData.department) {
               const deptResponse = await makeAuthenticatedRequest(`${config.api.host}${config.api.department}${userData.department}/`);
@@ -37,7 +40,15 @@ export function EmployeeSalarySlip() {
                 userData.departmentName = deptData.name;
               }
             }
-            
+
+            // Resolve designation UUID to name
+            if (desigResponse.ok) {
+              const desigData = await desigResponse.json();
+              const desigMap: Record<string, string> = {};
+              (desigData.results || []).forEach((d: any) => { desigMap[String(d.id)] = d.name || d.designation_name || d.title || String(d.id); });
+              userData.designation = desigMap[String(userData.designation)] || userData.designation;
+            }
+
             setSalary((prev: any) => ({ ...prev, userDetails: userData }));
           }
         }

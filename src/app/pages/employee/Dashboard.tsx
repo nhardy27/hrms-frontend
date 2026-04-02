@@ -76,11 +76,11 @@ export function EmployeeDashboard() {
       ]);
 
       // Build designation id -> name map
-      let designationMap: Record<number, string> = {};
+      let designationMap: Record<string, string> = {};
       if (designationRes.ok) {
         const desigData = await designationRes.json();
         (desigData.results || []).forEach((d: any) => {
-          designationMap[d.id] = d.name || d.designation_name || d.title || String(d.id);
+          designationMap[String(d.id)] = d.name || d.designation_name || d.title || String(d.id);
         });
       }
       
@@ -90,7 +90,7 @@ export function EmployeeDashboard() {
         const apiUserData = (usersData.results || []).find((u: any) => u.id === currentUserId);
         const designationId = apiUserData?.designation;
         const designationName = designationId
-          ? (designationMap[designationId] || String(designationId))
+          ? (designationMap[String(designationId)] || String(designationId))
           : 'N/A';
         
         setEmployee({

@@ -4,7 +4,7 @@
     "host": "wss://2pdxz2xv-8002.inc1.devtunnels.ms"
   },
   "api": {
-    "host_": "http://192.168.1.15:8000",
+    "host_": "http://192.168.1.10:8002",
     "host": "https://2pdxz2xv-8002.inc1.devtunnels.ms", 
     "token": "/auth/token/",
     "path": "/api/v1",
