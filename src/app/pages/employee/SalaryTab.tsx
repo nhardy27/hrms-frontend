@@ -71,7 +71,9 @@ export function SalaryTab() {
           year: typeof s.year === 'object' ? s.year.year : years.find((y: any) => y.id === s.year)?.year || s.year
         }));
         
-        setSalaries(userSalaries);
+        setSalaries(userSalaries.sort((a: SalaryRecord, b: SalaryRecord) => 
+          a.year !== b.year ? Number(a.year) - Number(b.year) : a.month - b.month
+        ));
       }
     } catch (error) {
       toast.error("Failed to load salary records");

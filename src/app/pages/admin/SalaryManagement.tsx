@@ -220,9 +220,8 @@ export function SalaryManagement() {
     const unpaidLeaveDeduction = r2(perDaySalary * absentDays);
     const earnedSalary         = r2(perDaySalary * paidDays);
 
-    // PF on prorated Earned Basic (not full basic), capped at ₹15,000
-    const earnedBasic = r2((basic / workingDays) * paidDays);
-    const pfAmount    = r2((Math.min(earnedBasic, 15000) * pfPct) / 100);
+    // PF on earned salary, capped at ₹15,000
+    const pfAmount = r2((Math.min(earnedSalary, 15000) * pfPct) / 100);
 
     // FIX: totalDeduction = LOP + PF (display field, consistent with both deductions)
     // netSalary = earnedSalary - PF only (LOP already excluded from earnedSalary)

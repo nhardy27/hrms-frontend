@@ -512,10 +512,10 @@ export function EmployeeDashboard() {
                     <i className="bi bi-box-arrow-in-right fs-1 mb-2" style={{ color: '#2c3e50' }}></i>
                     <h5 style={{ color: '#2c3e50' }}>Check In</h5>
                     <button
-                      className="btn text-white"
+                      className="btn text-white w-100"
                       onClick={handleCheckIn}
                       disabled={!!todayAttendance}
-                      style={{ background: '#2b3d4f', border: 'none' }}
+                      style={{ background: todayAttendance ? '#6c757d' : '#2b3d4f', border: 'none', opacity: todayAttendance ? 0.75 : 1, cursor: todayAttendance ? 'not-allowed' : 'pointer', fontSize: 'clamp(11px, 2.5vw, 14px)', whiteSpace: 'normal', lineHeight: 1.3 }}
                     >
                       {todayAttendance ? 'Already Checked In Today' : 'Check In'}
                     </button>
@@ -528,10 +528,10 @@ export function EmployeeDashboard() {
                     <i className="bi bi-box-arrow-right fs-1 mb-2" style={{ color: '#2c3e50' }}></i>
                     <h5 style={{ color: '#2c3e50' }}>Check Out</h5>
                     <button
-                      className="btn text-white"
+                      className="btn text-white w-100"
                       onClick={handleCheckOut}
                       disabled={!todayAttendance || hasCheckedOut}
-                      style={{ background: '#2b3d4f', border: 'none' }}
+                      style={{ background: (!todayAttendance || hasCheckedOut) ? '#6c757d' : '#2b3d4f', border: 'none', opacity: (!todayAttendance || hasCheckedOut) ? 0.75 : 1, cursor: (!todayAttendance || hasCheckedOut) ? 'not-allowed' : 'pointer', fontSize: 'clamp(11px, 2.5vw, 14px)', whiteSpace: 'normal', lineHeight: 1.3 }}
                     >
                       {hasCheckedOut ? 'Already Checked Out' : !todayAttendance ? 'Check In First' : 'Check Out'}
                     </button>
@@ -545,7 +545,7 @@ export function EmployeeDashboard() {
           {activeTab === 'attendance' && <AttendanceTab attendances={attendances} />}
           {activeTab === 'leaves' && <LeavesTab leaves={leaves} onLeaveApplied={fetchLeaveData} />}
           {activeTab === 'salary' && <SalaryTab />}
-          {activeTab === 'chat' && <ChatTab employee={employee} pendingChatUserId={pendingChatUserId} onPendingChatHandled={() => setPendingChatUserId(null)} />}
+          {activeTab === 'chat' && <ChatTab employee={employee} pendingChatUserId={pendingChatUserId} onPendingChatHandled={() => setPendingChatUserId(null)} onBack={() => setActiveTab('profile')} />}
         </div>
       </div>
     </div>

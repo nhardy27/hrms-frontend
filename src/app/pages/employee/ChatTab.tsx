@@ -33,6 +33,7 @@ interface ChatTabProps {
   } | null;
   pendingChatUserId?: number | null;
   onPendingChatHandled?: () => void;
+  onBack?: () => void;
 }
 
 const getInitials = (name: string) =>
@@ -79,7 +80,7 @@ const C = {
   datePillText: '#4a6080',
 };
 
-export function ChatTab({ employee, pendingChatUserId, onPendingChatHandled }: ChatTabProps) {
+export function ChatTab({ employee, pendingChatUserId, onPendingChatHandled, onBack }: ChatTabProps) {
   const [chatType] = useState<ChatType>('private');
   const [roomId, setRoomId] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -195,6 +196,15 @@ export function ChatTab({ employee, pendingChatUserId, onPendingChatHandled }: C
   // ── Sidebar header ──
   const SidebarHeader = (
     <div style={{ background: C.sidebarBg, padding: '0 16px', height: 60, display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, borderBottom: `1px solid ${C.sidebarBorder}` }}>
+      {onBack && (
+        <button
+          className="d-md-none"
+          style={{ background: 'none', border: 'none', color: '#fff', padding: '4px 8px 4px 0', cursor: 'pointer', flexShrink: 0 }}
+          onClick={onBack}
+        >
+          <i className="bi bi-arrow-left" style={{ fontSize: 18 }} />
+        </button>
+      )}
       <div style={{ width: 34, height: 34, borderRadius: 10, background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
         <i className="bi bi-chat-square-text-fill" style={{ fontSize: 15, color: '#fff' }} />
       </div>

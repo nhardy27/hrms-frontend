@@ -142,56 +142,39 @@ export function LeaveManagement() {
                         <td>{formatDate(leave.from_date)}</td>
                         <td>{formatDate(leave.to_date)}</td>
                         <td><span className="badge bg-info">{leave.total_leave || 0}</span></td>
-                        <td>{leave.reason}</td>
+                          <td style={{ maxWidth: '220px', whiteSpace: 'normal', wordBreak: 'break-word', fontSize: '0.85rem' }}>{leave.reason}</td>
                         <td>
                           <span className={getStatusBadge(leave.status)}>
                             {leave.status || 'Pending'}
                           </span>
                         </td>
                         <td>
-                          {(!leave.status || leave.status === 'PENDING') ? (
-                            <div className="d-flex gap-1">
-                              <button 
-                                className="btn btn-sm btn-success shadow-sm"
+                          <div className="d-flex flex-column gap-1">
+                            {leave.status !== 'APPROVED' && (
+                              <button
+                                className="btn btn-sm btn-outline-success shadow-sm"
                                 onClick={() => updateLeaveStatus(leave.id, 'APPROVED')}
                               >
                                 <i className="bi bi-check-circle me-1"></i>Approve
                               </button>
-                              <button 
-                                className="btn btn-sm btn-danger shadow-sm"
+                            )}
+                            {leave.status !== 'REJECTED' && (
+                              <button
+                                className="btn btn-sm btn-outline-danger shadow-sm"
                                 onClick={() => updateLeaveStatus(leave.id, 'REJECTED')}
                               >
                                 <i className="bi bi-x-circle me-1"></i>Reject
                               </button>
-                            </div>
-                          ) : (
-                            <div className="d-flex gap-1 flex-wrap">
-                              {leave.status !== 'APPROVED' && (
-                                <button 
-                                  className="btn btn-sm btn-outline-success shadow-sm"
-                                  onClick={() => updateLeaveStatus(leave.id, 'APPROVED')}
-                                >
-                                  <i className="bi bi-check-circle me-1"></i>Approve
-                                </button>
-                              )}
-                              {leave.status !== 'REJECTED' && (
-                                <button 
-                                  className="btn btn-sm btn-outline-danger shadow-sm"
-                                  onClick={() => updateLeaveStatus(leave.id, 'REJECTED')}
-                                >
-                                  <i className="bi bi-x-circle me-1"></i>Reject
-                                </button>
-                              )}
-                              {leave.status !== 'PENDING' && (
-                                <button 
-                                  className="btn btn-sm btn-outline-warning shadow-sm"
-                                  onClick={() => updateLeaveStatus(leave.id, 'PENDING')}
-                                >
-                                  <i className="bi bi-arrow-counterclockwise me-1"></i>Reset
-                                </button>
-                              )}
-                            </div>
-                          )}
+                            )}
+                            {leave.status && leave.status !== 'PENDING' && (
+                              <button
+                                className="btn btn-sm btn-outline-warning shadow-sm"
+                                onClick={() => updateLeaveStatus(leave.id, 'PENDING')}
+                              >
+                                <i className="bi bi-arrow-counterclockwise me-1"></i>Reset
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
